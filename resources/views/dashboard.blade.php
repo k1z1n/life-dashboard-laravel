@@ -2739,9 +2739,12 @@
 
         // Функция для обновления дашборда без перезагрузки
         function refreshDashboard(switchToProjectId = null) {
-            fetch('{{ route("dashboard") }}', {
+            // Добавляем timestamp для предотвращения кэширования на PWA
+            const timestamp = new Date().getTime();
+            fetch('{{ route("dashboard") }}?t=' + timestamp, {
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Cache-Control': 'no-cache'
                 }
             })
             .then(response => response.json())
@@ -2771,11 +2774,39 @@
                         desktopTabsContainers[0].innerHTML = newDesktopTabs[0].innerHTML;
                     }
 
-                    // Обновляем список проектов в мобильном меню
-                    const mobileTabsContainer = document.querySelector('#mobileActionsMenu .bg-white.rounded-xl.shadow-md .flex.items-center');
-                    const newMobileTabsContainer = doc.querySelector('#mobileActionsMenu .bg-white.rounded-xl.shadow-md .flex.items-center');
-                    if (newMobileTabsContainer && mobileTabsContainer) {
-                        mobileTabsContainer.innerHTML = newMobileTabsContainer.innerHTML;
+                    // Обновляем список проектов в мобильных вкладках (всегда видимые)
+                    // Ищем контейнер с классом sm:hidden (мобильные вкладки)
+                    const mobileTabsWrapper = document.querySelector('.sm\\:hidden.bg-white.rounded-xl.shadow-md.mb-6');
+                    const newMobileTabsWrapper = doc.querySelector('.sm\\:hidden.bg-white.rounded-xl.shadow-md.mb-6');
+
+                    if (newMobileTabsWrapper && mobileTabsWrapper) {
+                        const mobileTabsContainer = mobileTabsWrapper.querySelector('.flex.items-center');
+                        const newMobileTabsContainer = newMobileTabsWrapper.querySelector('.flex.items-center');
+
+                        if (newMobileTabsContainer && mobileTabsContainer) {
+                            // Сохраняем активную вкладку
+                            const activeMobileTab = mobileTabsContainer.querySelector('.tab-button.bg-blue-600');
+                            const activeTabId = activeMobileTab ? activeMobileTab.id.replace('tab-', '').replace('-mobile', '') : null;
+
+                            // Обновляем содержимое
+                            mobileTabsContainer.innerHTML = newMobileTabsContainer.innerHTML;
+
+                            // Восстанавливаем активное состояние
+                            if (activeTabId) {
+                                const restoredTab = document.getElementById('tab-' + activeTabId + '-mobile');
+                                if (restoredTab) {
+                                    restoredTab.classList.remove('text-slate-700', 'hover:bg-slate-100', 'hover:text-slate-900');
+                                    restoredTab.classList.add('bg-blue-600', 'text-white', 'shadow-sm');
+                                }
+                            }
+                        }
+                    }
+
+                    // Обновляем список проектов в мобильном меню (если есть)
+                    const mobileMenuTabsContainer = document.querySelector('#mobileActionsMenu .bg-white.rounded-xl.shadow-md .flex.items-center');
+                    const newMobileMenuTabsContainer = doc.querySelector('#mobileActionsMenu .bg-white.rounded-xl.shadow-md .flex.items-center');
+                    if (newMobileMenuTabsContainer && mobileMenuTabsContainer) {
+                        mobileMenuTabsContainer.innerHTML = newMobileMenuTabsContainer.innerHTML;
                     }
 
                     // Обновляем контент табов
@@ -2801,17 +2832,24 @@
                     // Переключаемся на нужную вкладку
                     setTimeout(() => {
                         if (targetTabId) {
-                            // Проверяем, существует ли вкладка с таким ID
+                            // Проверяем, существует ли вкладка с таким ID (десктоп)
                             const tabButton = document.getElementById('tab-' + targetTabId);
                             const tabContent = document.getElementById('tab-content-' + targetTabId);
+
+                            // Проверяем мобильную вкладку тоже
+                            const mobileTabButton = document.getElementById('tab-' + targetTabId + '-mobile');
+
                             if (tabButton && tabContent) {
+                                window.switchTab(targetTabId);
+                            } else if (mobileTabButton && tabContent) {
+                                // Если есть только мобильная вкладка, переключаемся через неё
                                 window.switchTab(targetTabId);
                             } else {
                                 // Если вкладка не существует (проект был удален), переключаемся на "all"
                                 window.switchTab('all');
                             }
                         }
-                    }, 50);
+                    }, 100);
 
                     // Переинициализируем drag and drop
                     setTimeout(() => {
