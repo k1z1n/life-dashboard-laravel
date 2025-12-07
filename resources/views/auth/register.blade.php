@@ -24,9 +24,9 @@
         @endif
 
         <form method="POST" action="{{ route('register') }}" class="space-y-6">
-            @csrf
+        @csrf
 
-            <div>
+        <div>
                 <label for="name" class="block text-sm font-medium text-slate-700 mb-2">Имя</label>
                 <input type="text" 
                        id="name" 
@@ -35,7 +35,7 @@
                        required 
                        autofocus
                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-            </div>
+        </div>
 
             <div>
                 <label for="email" class="block text-sm font-medium text-slate-700 mb-2">Email</label>
@@ -45,16 +45,16 @@
                        value="{{ old('email') }}" 
                        required
                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-            </div>
+        </div>
 
             <div>
                 <label for="password" class="block text-sm font-medium text-slate-700 mb-2">Пароль</label>
                 <input type="password" 
                        id="password" 
-                       name="password" 
+                            name="password"
                        required
                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-            </div>
+        </div>
 
             <div>
                 <label for="password_confirmation" class="block text-sm font-medium text-slate-700 mb-2">Подтвердите пароль</label>
@@ -63,7 +63,7 @@
                        name="password_confirmation" 
                        required
                        class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-            </div>
+        </div>
 
             <button type="submit" 
                     class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">

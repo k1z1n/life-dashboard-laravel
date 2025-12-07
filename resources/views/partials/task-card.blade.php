@@ -2,12 +2,20 @@
     <div class="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 lg:p-5 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md bg-white transition-all duration-200 {{ $task->completed ? 'opacity-60 bg-slate-50' : '' }} task-item cursor-pointer w-full max-w-full overflow-hidden" 
          draggable="true" 
          data-task-id="{{ $task->id }}"
-         onclick="window.openTaskDetailsModal({{ $task->id }}, '{{ addslashes($task->title) }}', '{{ addslashes($task->description ?? '') }}', {{ $task->priority_id ?? 'null' }}, '{{ $task->due_date ? $task->due_date->format('Y-m-d') : '' }}', {{ $task->project_id ?? 'null' }}, '{{ $task->due_time ?? '' }}', {{ $task->completed ? 'true' : 'false' }}, '{{ $task->priority ? addslashes($task->priority->name) : '' }}', '{{ $task->priority ? $task->priority->color : '' }}', @if($task->project_id) @php $projectData = \App\Models\Project::find($task->project_id); @endphp @if($projectData) '{{ addslashes($projectData->name) }}', '{{ $projectData->color }}' @else '', '' @endif @else '', '' @endif)">
+         onclick="if (!event.target.closest('.task-toggle-form') && !event.target.closest('button[type=\'submit\']')) { window.openTaskDetailsModal({{ $task->id }}, '{{ addslashes($task->title) }}', '{{ addslashes($task->description ?? '') }}', {{ $task->priority_id ?? 'null' }}, '{{ $task->due_date ? $task->due_date->format('Y-m-d') : '' }}', {{ $task->project_id ?? 'null' }}, '{{ $task->due_time ?? '' }}', {{ $task->completed ? 'true' : 'false' }}, '{{ $task->priority ? addslashes($task->priority->name) : '' }}', '{{ $task->priority ? $task->priority->color : '' }}', @if($task->project_id) @php $projectData = \App\Models\Project::find($task->project_id); @endphp @if($projectData) '{{ addslashes($projectData->name) }}', '{{ $projectData->color }}' @else '', '' @endif @else '', '' @endif); }">
         <!-- Checkbox -->
-        <form action="{{ route('tasks.toggle', $task) }}" method="POST" class="mt-0.5 flex-shrink-0 task-toggle-form" onmousedown="event.stopPropagation()" onsubmit="event.preventDefault(); toggleTaskComplete({{ $task->id }}, this); return false;">
+        <form action="{{ route('tasks.toggle', $task) }}" method="POST" class="mt-0.5 flex-shrink-0 task-toggle-form" 
+              onmousedown="event.stopPropagation()" 
+              onclick="event.stopPropagation()" 
+              ontouchstart="event.stopPropagation()"
+              onsubmit="event.preventDefault(); toggleTaskComplete({{ $task->id }}, this); return false;">
             @csrf
             @method('PATCH')
-            <button type="submit" class="w-6 h-6 rounded-md border-2 {{ $task->completed ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-green-400' }} flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+            <button type="submit" 
+                    class="w-6 h-6 rounded-md border-2 {{ $task->completed ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-green-400' }} flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    onclick="event.stopPropagation()"
+                    onmousedown="event.stopPropagation()"
+                    ontouchstart="event.stopPropagation()">
                 @if($task->completed)
                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
