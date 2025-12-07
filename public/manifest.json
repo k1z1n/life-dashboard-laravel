@@ -1,0 +1,21 @@
+{
+  "name": "Life Dashboard",
+  "short_name": "Life Dashboard",
+  "description": "Управление задачами и проектами",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ],
+  "scope": "/",
+  "prefer_related_applications": false,
+  "display_override": ["standalone", "fullscreen"]
+}
+
