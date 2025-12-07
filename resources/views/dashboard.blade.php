@@ -703,12 +703,32 @@
         window.openTaskModal = function(projectId = null) {
             document.getElementById('taskModal').classList.remove('hidden');
             lockBodyScroll();
-            document.getElementById('taskForm').action = '{{ route("tasks.store") }}';
-            document.getElementById('taskMethod').value = 'POST';
+
+            // ВАЖНО: Сначала очищаем все поля, чтобы избежать конфликтов
+            const taskForm = document.getElementById('taskForm');
+            const taskId = document.getElementById('taskId');
+            const taskMethod = document.getElementById('taskMethod');
+
+            // Явно очищаем taskId
+            if (taskId) {
+                taskId.value = '';
+            }
+
+            // Устанавливаем правильный метод и action
+            taskForm.action = '{{ route("tasks.store") }}';
+            taskMethod.value = 'POST';
             document.getElementById('taskModalTitle').textContent = 'Новая задача';
 
             // Сбрасываем форму
-            document.getElementById('taskForm').reset();
+            taskForm.reset();
+
+            // После reset снова очищаем taskId (на случай если reset не сработал)
+            if (taskId) {
+                taskId.value = '';
+            }
+
+            // Убеждаемся, что метод POST
+            taskMethod.value = 'POST';
 
             // Устанавливаем projectId после reset, чтобы он не сбросился
             if (projectId) {
@@ -2621,7 +2641,15 @@
                     const formData = new FormData(this);
                     const method = document.getElementById('taskMethod').value;
                     const taskId = document.getElementById('taskId').value;
-                    const url = taskId ? `/tasks/${taskId}` : '{{ route("tasks.store") }}';
+
+                    // Определяем URL на основе метода, а не taskId
+                    let url;
+                    if (method === 'PUT' && taskId) {
+                        url = `/tasks/${taskId}`;
+                    } else {
+                        // Для POST всегда используем store, даже если taskId есть (на случай ошибки)
+                        url = '{{ route("tasks.store") }}';
+                    }
 
                     // Собираем выбранные теги
                     const tagIds = [];
