@@ -65,4 +65,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Tag::class);
     }
+
+    public function telegramUser()
+    {
+        return $this->hasOne(TelegramUser::class);
+    }
+
+    public function hasTelegram(): bool
+    {
+        return $this->telegramUser()->exists();
+    }
 }

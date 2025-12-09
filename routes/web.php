@@ -21,6 +21,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
 
+// Telegram routes
+Route::prefix('telegram')->name('telegram.')->group(function () {
+    Route::get('/auth/link', [\App\Http\Controllers\Telegram\TelegramAuthController::class, 'generateAuthLink'])->name('auth.link');
+    Route::post('/auth/disconnect', [\App\Http\Controllers\Telegram\TelegramAuthController::class, 'disconnect'])->name('auth.disconnect');
+    Route::get('/auth/status', [\App\Http\Controllers\Telegram\TelegramAuthController::class, 'status'])->name('auth.status');
+});
+
 Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
 Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
 Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');

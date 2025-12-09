@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#3b82f6">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Профиль - Life Dashboard</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -38,13 +39,39 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <!-- Profile Info -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-            <div class="flex items-center gap-4">
-                <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                    {{ strtoupper(substr($user->name, 0, 1)) }}
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                        {{ strtoupper(substr($user->name, 0, 1)) }}
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">{{ $user->name }}</h2>
+                        <p class="text-slate-600">{{ $user->email }}</p>
+                    </div>
                 </div>
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-900">{{ $user->name }}</h2>
-                    <p class="text-slate-600">{{ $user->email }}</p>
+
+                <!-- Telegram Connection -->
+                <div id="telegram-connection" class="flex-shrink-0">
+                    @if($user->hasTelegram())
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+                                <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                                <span class="text-sm font-medium text-green-700">Telegram подключен</span>
+                            </div>
+                            <button onclick="disconnectTelegram()" class="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-lg transition-colors">
+                                Отключить
+                            </button>
+                        </div>
+                    @else
+                        <button onclick="connectTelegram()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.86 8.779c-.14.625-.506.781-1.026.486l-2.83-2.087-1.366 1.312c-.151.151-.277.277-.569.277l.203-2.872 5.24-4.734c.228-.203-.05-.316-.354-.113l-6.473 4.078-2.789-.87c-.607-.19-.619-.607.127-.899l10.906-4.202c.506-.19.948.113.783.899z"/>
+                            </svg>
+                            Подключить Telegram
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
@@ -230,6 +257,62 @@
             } else {
                 tasksElement.classList.add('hidden');
                 chevronElement.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function connectTelegram() {
+            try {
+                const response = await fetch('/telegram/auth/link', {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'Accept': 'application/json',
+                    },
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Open Telegram deep link
+                    window.open(data.link, '_blank');
+
+                    // Show message
+                    alert('Перейдите в Telegram и нажмите "Start" для завершения подключения.\n\nПосле подключения обновите страницу.');
+                } else {
+                    alert('Ошибка: ' + (data.message || 'Не удалось создать ссылку'));
+                }
+            } catch (error) {
+                console.error('Error connecting Telegram:', error);
+                alert('Произошла ошибка при подключении Telegram');
+            }
+        }
+
+        async function disconnectTelegram() {
+            if (!confirm('Вы уверены, что хотите отключить Telegram?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/telegram/auth/disconnect', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Telegram успешно отключен');
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + (data.message || 'Не удалось отключить'));
+                }
+            } catch (error) {
+                console.error('Error disconnecting Telegram:', error);
+                alert('Произошла ошибка при отключении Telegram');
             }
         }
     </script>
