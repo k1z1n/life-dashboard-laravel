@@ -203,12 +203,19 @@ class ProcessTelegramCallback implements ShouldQueue
         $tasks = $telegramTaskService->getTasksList($user, 'active');
         $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи');
 
-        $botService->editMessage(
-            $chatId,
-            $messageId,
-            $formatted['text'],
-            $formatted['keyboard'] ? $botService->createInlineKeyboard($formatted['keyboard']) : null
-        );
+        try {
+            $botService->editMessage(
+                $chatId,
+                $messageId,
+                $formatted['text'],
+                $formatted['keyboard'] ? $botService->createInlineKeyboard($formatted['keyboard']) : null
+            );
+        } catch (\Exception $e) {
+            // Ignore "message is not modified" error
+            if (!str_contains($e->getMessage(), 'message is not modified')) {
+                throw $e;
+            }
+        }
     }
 
     protected function showTaskDetails(
@@ -221,12 +228,19 @@ class ProcessTelegramCallback implements ShouldQueue
         $message = $telegramTaskService->formatTaskMessage($task, true);
         $keyboard = $telegramTaskService->getTaskActionsKeyboard($task);
 
-        $botService->editMessage(
-            $chatId,
-            $messageId,
-            $message,
-            $botService->createInlineKeyboard($keyboard)
-        );
+        try {
+            $botService->editMessage(
+                $chatId,
+                $messageId,
+                $message,
+                $botService->createInlineKeyboard($keyboard)
+            );
+        } catch (\Exception $e) {
+            // Ignore "message is not modified" error
+            if (!str_contains($e->getMessage(), 'message is not modified')) {
+                throw $e;
+            }
+        }
     }
 
     protected function showProfile(int $chatId, $user, TelegramBotService $botService): void
