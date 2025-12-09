@@ -21,9 +21,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         ]);
-
-        // Rate limiters
-        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

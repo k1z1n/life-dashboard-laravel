@@ -261,7 +261,9 @@
         }
 
         async function connectTelegram() {
+            console.log('connectTelegram called');
             try {
+                console.log('Fetching auth link...');
                 const response = await fetch('/telegram/auth/link', {
                     method: 'GET',
                     headers: {
@@ -270,7 +272,9 @@
                     },
                 });
 
+                console.log('Response:', response);
                 const data = await response.json();
+                console.log('Data:', data);
 
                 if (data.success) {
                     // Open Telegram deep link
