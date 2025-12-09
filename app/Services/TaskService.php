@@ -31,22 +31,35 @@ class TaskService
     public function createTask(TaskDTO $dto): Task
     {
         $task = $this->repository->create($dto->toArray());
-        
+
         // Синхронизируем теги
         if (!empty($dto->tagIds)) {
             $task->tags()->sync($dto->tagIds);
         }
-        
+
         return $task->load('tags');
     }
 
     public function updateTask(Task $task, TaskDTO $dto): Task
     {
-        $task = $this->repository->update($task, $dto->toArray());
-        
+        $data = $dto->toArray();
+
+        // Управление completed_at при изменении статуса выполнения
+        if (isset($data['completed'])) {
+            if ($data['completed'] && !$task->completed) {
+                // Задача помечается как выполненная
+                $data['completed_at'] = now();
+            } elseif (!$data['completed'] && $task->completed) {
+                // Задача помечается как невыполненная
+                $data['completed_at'] = null;
+            }
+        }
+
+        $task = $this->repository->update($task, $data);
+
         // Синхронизируем теги
         $task->tags()->sync($dto->tagIds ?? []);
-        
+
         return $task->load('tags');
     }
 
@@ -57,8 +70,11 @@ class TaskService
 
     public function toggleComplete(Task $task): Task
     {
+        $newCompletedStatus = !$task->completed;
+
         return $this->repository->update($task, [
-            'completed' => !$task->completed,
+            'completed' => $newCompletedStatus,
+            'completed_at' => $newCompletedStatus ? now() : null,
         ]);
     }
 

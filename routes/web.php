@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PriorityController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TaskController;
@@ -18,6 +19,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middl
 // Protected routes
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
 
 Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
 Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');

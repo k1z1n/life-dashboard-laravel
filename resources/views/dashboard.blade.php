@@ -116,18 +116,26 @@
                     </svg>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">Life Dashboard</h1>
-                    <p class="text-sm text-slate-600 mt-1">{{ auth()->user()->name }}</p>
+{{--                    <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">{{ auth()->user()->name }}</h1>--}}
+{{--                    <p class="text-sm text-slate-600 mt-1">Управление задачами</p>--}}
                 </div>
-                <form action="{{ route('logout') }}" method="POST" class="flex-shrink-0">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 text-sm sm:text-base">
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="{{ route('profile') }}" class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm sm:text-base">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                         </svg>
-                        Выйти
-                    </button>
-                </form>
+                        <span class="hidden sm:inline">Профиль</span>
+                    </a>
+                    <form action="{{ route('logout') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 text-sm sm:text-base">
+                            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span class="hidden sm:inline">Выйти</span>
+                        </button>
+                    </form>
+                </div>
             </div>
         </header>
 

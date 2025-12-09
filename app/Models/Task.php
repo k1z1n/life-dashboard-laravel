@@ -14,6 +14,7 @@ class Task extends Model
         'title',
         'description',
         'completed',
+        'completed_at',
         'priority_id',
         'due_date',
         'due_time',
@@ -23,6 +24,7 @@ class Task extends Model
     protected $casts = [
         'completed' => 'boolean',
         'due_date' => 'date',
+        'completed_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -46,7 +48,7 @@ class Task extends Model
     {
         return $this->belongsTo(Project::class);
     }
-    
+
     // Accessor для due_time (формат H:i)
     public function getDueTimeAttribute($value)
     {
@@ -72,20 +74,20 @@ class Task extends Model
         if (!$this->due_date || $this->completed) {
             return null;
         }
-        
+
         $now = now();
-        
+
         // Если указано время и срок сегодня, используем точное время
         if ($this->due_time && $this->due_date->isToday()) {
             $due = $this->due_date->copy()->setTimeFromTimeString($this->due_time);
         } else {
             $due = $this->due_date->endOfDay();
         }
-        
+
         if ($due->isPast()) {
             return null; // Просрочено
         }
-        
+
         return max(0, $now->diffInHours($due));
     }
 
@@ -94,20 +96,20 @@ class Task extends Model
         if (!$this->due_date || $this->completed) {
             return null;
         }
-        
+
         $now = now();
-        
+
         // Если указано время и срок сегодня, используем точное время
         if ($this->due_time && $this->due_date->isToday()) {
             $due = $this->due_date->copy()->setTimeFromTimeString($this->due_time);
         } else {
             return null; // Для других дней не показываем минуты
         }
-        
+
         if ($due->isPast()) {
             return null; // Просрочено
         }
-        
+
         return max(0, $now->diffInMinutes($due));
     }
 
@@ -116,20 +118,20 @@ class Task extends Model
         if (!$this->due_date || $this->completed) {
             return null;
         }
-        
+
         $now = now();
-        
+
         // Если указано время и срок сегодня, используем точное время
         if ($this->due_time && $this->due_date->isToday()) {
             $due = $this->due_date->copy()->setTimeFromTimeString($this->due_time);
         } else {
             $due = $this->due_date->endOfDay();
         }
-        
+
         if ($due->isPast()) {
             return null; // Просрочено
         }
-        
+
         return max(0, $now->diffInDays($due));
     }
 
