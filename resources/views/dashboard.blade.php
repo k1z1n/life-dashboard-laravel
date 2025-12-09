@@ -753,23 +753,55 @@
         };
 
         window.openEditTaskModal = function(id, title, description, priorityId, dueDate, projectId, dueTime = '', tagIds = []) {
-            document.getElementById('taskModal').classList.remove('hidden');
-            lockBodyScroll();
-            document.getElementById('taskForm').action = `/tasks/${id}`;
-            document.getElementById('taskMethod').value = 'PUT';
-            document.getElementById('taskModalTitle').textContent = 'Редактировать задачу';
-            document.getElementById('taskId').value = id;
-            document.getElementById('taskTitle').value = title;
-            document.getElementById('taskDescription').value = description || '';
-            document.getElementById('taskPriority').value = priorityId || '';
-            document.getElementById('taskDueDate').value = dueDate || '';
-            document.getElementById('taskDueTime').value = dueTime || '';
-            document.getElementById('taskProjectId').value = projectId || '';
-            // Установка тегов
-            const tagIdsArray = Array.isArray(tagIds) ? tagIds : (tagIds ? [tagIds] : []);
-            document.querySelectorAll('input[name="tag_ids[]"]').forEach(checkbox => {
-                checkbox.checked = tagIdsArray.includes(parseInt(checkbox.value));
-            });
+            try {
+                const taskModal = document.getElementById('taskModal');
+                if (!taskModal) {
+                    console.error('taskModal element not found');
+                    return;
+                }
+
+                taskModal.classList.remove('hidden');
+                lockBodyScroll();
+
+                const taskForm = document.getElementById('taskForm');
+                const taskMethod = document.getElementById('taskMethod');
+                if (!taskForm || !taskMethod) {
+                    console.error('taskForm or taskMethod element not found');
+                    return;
+                }
+
+                taskForm.action = `/tasks/${id}`;
+                taskMethod.value = 'PUT';
+
+                const taskModalTitle = document.getElementById('taskModalTitle');
+                if (taskModalTitle) {
+                    taskModalTitle.textContent = 'Редактировать задачу';
+                }
+
+                const taskIdEl = document.getElementById('taskId');
+                const taskTitleEl = document.getElementById('taskTitle');
+                const taskDescriptionEl = document.getElementById('taskDescription');
+                const taskPriorityEl = document.getElementById('taskPriority');
+                const taskDueDateEl = document.getElementById('taskDueDate');
+                const taskDueTimeEl = document.getElementById('taskDueTime');
+                const taskProjectIdEl = document.getElementById('taskProjectId');
+
+                if (taskIdEl) taskIdEl.value = id;
+                if (taskTitleEl) taskTitleEl.value = title || '';
+                if (taskDescriptionEl) taskDescriptionEl.value = description || '';
+                if (taskPriorityEl) taskPriorityEl.value = priorityId || '';
+                if (taskDueDateEl) taskDueDateEl.value = dueDate || '';
+                if (taskDueTimeEl) taskDueTimeEl.value = dueTime || '';
+                if (taskProjectIdEl) taskProjectIdEl.value = projectId || '';
+
+                // Установка тегов
+                const tagIdsArray = Array.isArray(tagIds) ? tagIds : (tagIds ? [tagIds] : []);
+                document.querySelectorAll('input[name="tag_ids[]"]').forEach(checkbox => {
+                    checkbox.checked = tagIdsArray.includes(parseInt(checkbox.value));
+                });
+            } catch (error) {
+                console.error('Error in openEditTaskModal:', error);
+            }
         };
 
 
@@ -879,26 +911,38 @@
         };
 
         window.editTaskFromDetails = function() {
-            if (currentTaskDetails) {
-                window.closeTaskDetailsModal();
-                // Получаем теги задачи из DOM
-                const taskElement = document.querySelector(`[data-task-id="${currentTaskDetails.id}"]`);
-                let tagIds = [];
-                if (taskElement) {
-                    const tagElements = taskElement.querySelectorAll('[data-tag-id]');
-                    tagIds = Array.from(tagElements).map(el => parseInt(el.getAttribute('data-tag-id')));
-                }
+            if (!currentTaskDetails) {
+                console.error('currentTaskDetails is null');
+                return;
+            }
+
+            // Сохраняем данные перед закрытием модального окна
+            const taskData = { ...currentTaskDetails };
+
+            // Получаем теги задачи из DOM перед закрытием модального окна
+            const taskElement = document.querySelector(`[data-task-id="${taskData.id}"]`);
+            let tagIds = [];
+            if (taskElement) {
+                const tagElements = taskElement.querySelectorAll('[data-tag-id]');
+                tagIds = Array.from(tagElements).map(el => parseInt(el.getAttribute('data-tag-id')));
+            }
+
+            // Закрываем модальное окно подробностей
+            window.closeTaskDetailsModal();
+
+            // Небольшая задержка для завершения анимации закрытия, затем открываем редактирование
+            setTimeout(() => {
                 window.openEditTaskModal(
-                    currentTaskDetails.id,
-                    currentTaskDetails.title,
-                    currentTaskDetails.description,
-                    currentTaskDetails.priorityId,
-                    currentTaskDetails.dueDate,
-                    currentTaskDetails.projectId,
-                    currentTaskDetails.dueTime || '',
+                    taskData.id,
+                    taskData.title,
+                    taskData.description || '',
+                    taskData.priorityId || null,
+                    taskData.dueDate || '',
+                    taskData.projectId || null,
+                    taskData.dueTime || '',
                     tagIds
                 );
-            }
+            }, 100);
         };
 
         // Color picker sync
@@ -2197,7 +2241,7 @@
             </div>
 
             <div class="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-slate-200">
-                <button onclick="window.editTaskFromDetails()"
+                <button type="button" onclick="event.stopPropagation(); window.editTaskFromDetails();"
                         class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
