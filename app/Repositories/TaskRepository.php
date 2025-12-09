@@ -12,6 +12,13 @@ class TaskRepository implements TaskRepositoryInterface
     {
         return Task::with(['priority', 'tags'])
             ->where('user_id', $userId)
+            ->where(function ($query) {
+                $query->where('completed', false)
+                    ->orWhere(function ($q) {
+                        $q->where('completed', true)
+                          ->whereDate('completed_at', '>=', now()->startOfDay());
+                    });
+            })
             ->orderBy('completed')
             ->orderBy('order', 'asc')
             ->orderByRaw('(SELECT `order` FROM priorities WHERE priorities.id = tasks.priority_id) DESC')
@@ -23,6 +30,13 @@ class TaskRepository implements TaskRepositoryInterface
     {
         $query = Task::with(['priority', 'tags'])
             ->where('user_id', $userId)
+            ->where(function ($query) {
+                $query->where('completed', false)
+                    ->orWhere(function ($q) {
+                        $q->where('completed', true)
+                          ->whereDate('completed_at', '>=', now()->startOfDay());
+                    });
+            })
             ->orderBy('completed')
             ->orderBy('order', 'asc')
             ->orderByRaw('(SELECT `order` FROM priorities WHERE priorities.id = tasks.priority_id) DESC')
@@ -61,7 +75,7 @@ class TaskRepository implements TaskRepositoryInterface
     public function reorder(array $taskIds, int $userId): void
     {
         \Log::info('TaskRepository::reorder called', ['task_ids' => $taskIds, 'user_id' => $userId]);
-        
+
         foreach ($taskIds as $index => $taskId) {
             $order = $index + 1;
             Task::where('id', $taskId)->where('user_id', $userId)->update(['order' => $order]);
