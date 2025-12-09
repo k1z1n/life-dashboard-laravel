@@ -24,11 +24,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Rate limiters
         $middleware->throttleApi();
-
-        // Custom rate limiter for Telegram webhook
-        RateLimiter::for('telegram', function (Request $request) {
-            return Limit::perMinute(60)->by($request->ip());
-        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
