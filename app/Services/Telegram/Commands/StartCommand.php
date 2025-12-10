@@ -58,7 +58,7 @@ class StartCommand implements TelegramCommandInterface
         $this->botService->sendMessage(
             $chatId,
             $message,
-            $this->keyboardService->getMainMenu()
+            $this->keyboardService->getMainMenuKeyboard()
         );
 
         // Также отправим inline меню
@@ -169,7 +169,7 @@ class StartCommand implements TelegramCommandInterface
         $this->botService->sendMessage(
             $chatId,
             $message,
-            $this->keyboardService->getMainMenu()
+            $this->keyboardService->getMainMenuKeyboard()
         );
 
         // И inline кнопки быстрых действий

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Обработка текстовых сообщений (Reply Keyboard и свободный текст)
+ * Контекстные клавиатуры меняются в зависимости от действия
  */
 class ProcessTelegramMessage implements ShouldQueue
 {
@@ -68,20 +69,17 @@ class ProcessTelegramMessage implements ShouldQueue
                 return;
             }
 
-            // Обработка кнопок Reply Keyboard (главное меню)
-            $handled = $this->handleReplyKeyboard(
+            // Обработка кнопок Reply Keyboard
+            $this->handleReplyKeyboard(
                 $text,
                 $chatId,
                 $user,
                 $botService,
                 $telegramTaskService,
+                $taskService,
+                $conversationManager,
                 $keyboardService
             );
-
-            if (!$handled) {
-                // Неизвестное сообщение — предлагаем создать задачу или показать помощь
-                $this->handleUnknownText($chatId, $text, $botService, $keyboardService);
-            }
 
         } catch (\Exception $e) {
             Log::channel('telegram')->error('Error processing text message', [
@@ -100,47 +98,103 @@ class ProcessTelegramMessage implements ShouldQueue
         $user,
         TelegramBotService $botService,
         TelegramTaskService $telegramTaskService,
+        TaskService $taskService,
+        ConversationManager $conversationManager,
         TelegramKeyboardService $keyboardService
-    ): bool {
+    ): void {
         // Убираем emoji из начала для сравнения
         $cleanText = $this->cleanButtonText($text);
 
         switch ($cleanText) {
+            // ═══════════════════════════════════════
+            // ГЛАВНОЕ МЕНЮ
+            // ═══════════════════════════════════════
             case 'Мои задачи':
+            case 'Все':
                 $this->showTasks($chatId, $user, $botService, $telegramTaskService, $keyboardService, 'active');
-                return true;
+                break;
 
             case 'Сегодня':
                 $this->showTasks($chatId, $user, $botService, $telegramTaskService, $keyboardService, 'today');
-                return true;
+                break;
 
-            case 'Создать задачу':
-                $this->startCreateTask($chatId, $botService);
-                return true;
+            case 'Готово':
+                $this->showTasks($chatId, $user, $botService, $telegramTaskService, $keyboardService, 'completed');
+                break;
 
             case 'Просрочено':
                 $this->showTasks($chatId, $user, $botService, $telegramTaskService, $keyboardService, 'overdue');
-                return true;
+                break;
+
+            case 'Создать':
+            case 'Создать задачу':
+                $this->startCreateTask($chatId, $botService, $conversationManager, $keyboardService);
+                break;
 
             case 'Проекты':
                 $this->showProjects($chatId, $user, $botService, $keyboardService);
-                return true;
+                break;
 
             case 'Статистика':
                 $this->showProfile($chatId, $user, $botService, $keyboardService);
-                return true;
+                break;
 
             case 'Настройки':
                 $this->showSettings($chatId, $botService, $keyboardService);
-                return true;
+                break;
 
             case 'Помощь':
-                $helpCommand = new HelpCommand($botService);
-                $helpCommand->sendHelp($chatId);
-                return true;
+                $this->showHelp($chatId, $botService, $keyboardService);
+                break;
 
+            // ═══════════════════════════════════════
+            // НАВИГАЦИЯ
+            // ═══════════════════════════════════════
+            case 'Главное меню':
+            case 'Меню':
+                $this->showMainMenu($chatId, $user, $botService, $keyboardService);
+                break;
+
+            case 'Назад':
+            case 'К списку':
+                $this->showTasks($chatId, $user, $botService, $telegramTaskService, $keyboardService, 'active');
+                break;
+
+            case 'Обновить':
+                $this->showTasks($chatId, $user, $botService, $telegramTaskService, $keyboardService, 'active');
+                break;
+
+            // ═══════════════════════════════════════
+            // ОТМЕНА / ПОДТВЕРЖДЕНИЕ
+            // ═══════════════════════════════════════
+            case 'Отмена':
+                $conversationManager->clearState($chatId);
+                $botService->sendMessage(
+                    $chatId,
+                    TelegramIcons::ERROR . " Действие отменено.",
+                    $keyboardService->getMainMenuKeyboard()
+                );
+                break;
+
+            case 'Да':
+                // Обработка подтверждения через conversation state
+                $this->handleConfirmation($chatId, true, $user, $botService, $taskService, $conversationManager, $keyboardService);
+                break;
+
+            case 'Нет':
+                $conversationManager->clearState($chatId);
+                $botService->sendMessage(
+                    $chatId,
+                    TelegramIcons::SUCCESS . " Отменено.",
+                    $keyboardService->getMainMenuKeyboard()
+                );
+                break;
+
+            // ═══════════════════════════════════════
+            // НЕИЗВЕСТНЫЙ ТЕКСТ
+            // ═══════════════════════════════════════
             default:
-                return false;
+                $this->handleUnknownText($chatId, $text, $user, $botService, $taskService, $conversationManager, $keyboardService);
         }
     }
 
@@ -149,78 +203,33 @@ class ProcessTelegramMessage implements ShouldQueue
      */
     protected function cleanButtonText(string $text): string
     {
-        // Убираем все emoji и лишние пробелы
-        $clean = preg_replace('/[\x{1F600}-\x{1F64F}]/u', '', $text); // emoticons
-        $clean = preg_replace('/[\x{1F300}-\x{1F5FF}]/u', '', $clean); // symbols
-        $clean = preg_replace('/[\x{1F680}-\x{1F6FF}]/u', '', $clean); // transport
-        $clean = preg_replace('/[\x{1F1E0}-\x{1F1FF}]/u', '', $clean); // flags
-        $clean = preg_replace('/[\x{2600}-\x{26FF}]/u', '', $clean); // misc symbols
-        $clean = preg_replace('/[\x{2700}-\x{27BF}]/u', '', $clean); // dingbats
-        $clean = preg_replace('/[\x{FE00}-\x{FE0F}]/u', '', $clean); // variation selectors
-        $clean = preg_replace('/[\x{1F900}-\x{1F9FF}]/u', '', $clean); // supplemental symbols
-        $clean = preg_replace('/[\x{1FA00}-\x{1FA6F}]/u', '', $clean); // chess symbols
-        $clean = preg_replace('/[\x{1FA70}-\x{1FAFF}]/u', '', $clean); // symbols extended
-        $clean = preg_replace('/[\x{231A}-\x{231B}]/u', '', $clean); // watch, hourglass
-        $clean = preg_replace('/[\x{23E9}-\x{23F3}]/u', '', $clean); // media symbols
-        $clean = preg_replace('/[\x{23F8}-\x{23FA}]/u', '', $clean); // media symbols 2
-        $clean = preg_replace('/[\x{25AA}-\x{25AB}]/u', '', $clean); // squares
-        $clean = preg_replace('/[\x{25B6}]/u', '', $clean); // play button
-        $clean = preg_replace('/[\x{25C0}]/u', '', $clean); // reverse button
-        $clean = preg_replace('/[\x{25FB}-\x{25FE}]/u', '', $clean); // squares 2
-        $clean = preg_replace('/[\x{2614}-\x{2615}]/u', '', $clean); // umbrella, coffee
-        $clean = preg_replace('/[\x{2648}-\x{2653}]/u', '', $clean); // zodiac
-        $clean = preg_replace('/[\x{267F}]/u', '', $clean); // wheelchair
-        $clean = preg_replace('/[\x{2693}]/u', '', $clean); // anchor
-        $clean = preg_replace('/[\x{26A1}]/u', '', $clean); // high voltage
-        $clean = preg_replace('/[\x{26AA}-\x{26AB}]/u', '', $clean); // circles
-        $clean = preg_replace('/[\x{26BD}-\x{26BE}]/u', '', $clean); // balls
-        $clean = preg_replace('/[\x{26C4}-\x{26C5}]/u', '', $clean); // weather
-        $clean = preg_replace('/[\x{26CE}]/u', '', $clean); // ophiuchus
-        $clean = preg_replace('/[\x{26D4}]/u', '', $clean); // no entry
-        $clean = preg_replace('/[\x{26EA}]/u', '', $clean); // church
-        $clean = preg_replace('/[\x{26F2}-\x{26F3}]/u', '', $clean); // fountain, golf
-        $clean = preg_replace('/[\x{26F5}]/u', '', $clean); // sailboat
-        $clean = preg_replace('/[\x{26FA}]/u', '', $clean); // tent
-        $clean = preg_replace('/[\x{26FD}]/u', '', $clean); // fuel pump
-        $clean = preg_replace('/[\x{2702}]/u', '', $clean); // scissors
-        $clean = preg_replace('/[\x{2705}]/u', '', $clean); // check mark
-        $clean = preg_replace('/[\x{2708}-\x{270D}]/u', '', $clean); // airplane to writing hand
-        $clean = preg_replace('/[\x{270F}]/u', '', $clean); // pencil
-        $clean = preg_replace('/[\x{2712}]/u', '', $clean); // black nib
-        $clean = preg_replace('/[\x{2714}]/u', '', $clean); // check mark
-        $clean = preg_replace('/[\x{2716}]/u', '', $clean); // x mark
-        $clean = preg_replace('/[\x{271D}]/u', '', $clean); // cross
-        $clean = preg_replace('/[\x{2721}]/u', '', $clean); // star of david
-        $clean = preg_replace('/[\x{2728}]/u', '', $clean); // sparkles
-        $clean = preg_replace('/[\x{2733}-\x{2734}]/u', '', $clean); // eight spoked asterisk
-        $clean = preg_replace('/[\x{2744}]/u', '', $clean); // snowflake
-        $clean = preg_replace('/[\x{2747}]/u', '', $clean); // sparkle
-        $clean = preg_replace('/[\x{274C}]/u', '', $clean); // cross mark
-        $clean = preg_replace('/[\x{274E}]/u', '', $clean); // cross mark button
-        $clean = preg_replace('/[\x{2753}-\x{2755}]/u', '', $clean); // question marks
-        $clean = preg_replace('/[\x{2757}]/u', '', $clean); // exclamation mark
-        $clean = preg_replace('/[\x{2763}-\x{2764}]/u', '', $clean); // heart exclamation
-        $clean = preg_replace('/[\x{2795}-\x{2797}]/u', '', $clean); // plus, minus, divide
-        $clean = preg_replace('/[\x{27A1}]/u', '', $clean); // right arrow
-        $clean = preg_replace('/[\x{27B0}]/u', '', $clean); // curly loop
-        $clean = preg_replace('/[\x{27BF}]/u', '', $clean); // double curly loop
-        $clean = preg_replace('/[\x{2934}-\x{2935}]/u', '', $clean); // arrows
-        $clean = preg_replace('/[\x{2B05}-\x{2B07}]/u', '', $clean); // arrows
-        $clean = preg_replace('/[\x{2B1B}-\x{2B1C}]/u', '', $clean); // squares
-        $clean = preg_replace('/[\x{2B50}]/u', '', $clean); // star
-        $clean = preg_replace('/[\x{2B55}]/u', '', $clean); // circle
-        $clean = preg_replace('/[\x{3030}]/u', '', $clean); // wavy dash
-        $clean = preg_replace('/[\x{303D}]/u', '', $clean); // part alternation mark
-        $clean = preg_replace('/[\x{3297}]/u', '', $clean); // circled ideograph congratulation
-        $clean = preg_replace('/[\x{3299}]/u', '', $clean); // circled ideograph secret
-        $clean = preg_replace('/[\x{FE0F}]/u', '', $clean); // variation selector
-        $clean = preg_replace('/[\x{200D}]/u', '', $clean); // zero width joiner
+        // Удаляем все emoji и спецсимволы
+        $clean = preg_replace('/[\x{1F000}-\x{1FFFF}]/u', '', $text);
+        $clean = preg_replace('/[\x{2000}-\x{2BFF}]/u', '', $clean);
+        $clean = preg_replace('/[\x{FE00}-\x{FE0F}]/u', '', $clean);
+        $clean = preg_replace('/[\x{200D}]/u', '', $clean);
 
         return trim($clean);
     }
 
     /**
-     * Показать список задач
+     * 🏠 Показать главное меню
+     */
+    protected function showMainMenu(
+        int $chatId,
+        $user,
+        TelegramBotService $botService,
+        TelegramKeyboardService $keyboardService
+    ): void {
+        $message = TelegramIcons::HOME . " <b>Главное меню</b>\n\n";
+        $message .= "Привет, <b>{$user->name}</b>! " . TelegramIcons::WAVE . "\n\n";
+        $message .= "Выберите действие:";
+
+        $botService->sendMessage($chatId, $message, $keyboardService->getMainMenuKeyboard());
+    }
+
+    /**
+     * 📋 Показать список задач
      */
     protected function showTasks(
         int $chatId,
@@ -232,51 +241,61 @@ class ProcessTelegramMessage implements ShouldQueue
     ): void {
         $titles = [
             'active' => 'Все задачи',
-            'today' => 'Задачи на сегодня',
-            'completed' => 'Выполненные',
-            'overdue' => 'Просроченные',
+            'today' => TelegramIcons::TODAY . ' Сегодня',
+            'completed' => TelegramIcons::TASK_DONE . ' Выполненные',
+            'overdue' => TelegramIcons::OVERDUE . ' Просроченные',
         ];
 
         $tasks = $telegramTaskService->getTasksList($user, $filter);
         $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи');
 
-        // Добавляем фильтры
-        $keyboard = $keyboardService->getTasksListInline($filter);
-
-        // Добавляем кнопки задач
+        // Inline фильтры + кнопки задач
+        $inlineKeyboard = $keyboardService->getTasksFiltersInline($filter);
         if ($formatted['keyboard']) {
-            $keyboard['inline_keyboard'] = array_merge(
+            $inlineKeyboard['inline_keyboard'] = array_merge(
                 $formatted['keyboard'],
-                $keyboard['inline_keyboard']
+                $inlineKeyboard['inline_keyboard']
             );
         }
 
-        $botService->sendMessage($chatId, $formatted['text'], $keyboard);
+        // Отправляем с Reply Keyboard для списка + Inline кнопки
+        $botService->sendMessage($chatId, $formatted['text'], $keyboardService->getTasksListKeyboard());
+
+        // И отдельно inline кнопки
+        if (!empty($inlineKeyboard['inline_keyboard'])) {
+            $botService->sendMessage(
+                $chatId,
+                TelegramIcons::TARGET . " <b>Действия:</b>",
+                $inlineKeyboard
+            );
+        }
     }
 
     /**
-     * Начать создание задачи
+     * ➕ Начать создание задачи
      */
-    protected function startCreateTask(int $chatId, TelegramBotService $botService): void
-    {
+    protected function startCreateTask(
+        int $chatId,
+        TelegramBotService $botService,
+        ConversationManager $conversationManager,
+        TelegramKeyboardService $keyboardService
+    ): void {
+        // Устанавливаем состояние диалога
+        $conversationManager->setState($chatId, [
+            'action' => 'create_task',
+            'step' => 'title',
+        ]);
+
         $text = TelegramIcons::TASK_NEW . " <b>Создание задачи</b>\n\n";
         $text .= "Введите название новой задачи:\n\n";
-        $text .= TelegramIcons::BULB . " <i>Или используйте быструю команду:</i>\n";
-        $text .= "<code>/add Название задачи</code>";
+        $text .= TelegramIcons::BULB . " <i>Или нажмите «Отмена» для возврата</i>";
 
-        $keyboard = [
-            'inline_keyboard' => [
-                [['text' => TelegramIcons::ERROR . ' Отмена', 'callback_data' => 'newtask_cancel']],
-            ],
-        ];
-
-        $botService->sendMessage($chatId, $text, $keyboard);
-
-        // TODO: Активировать conversation state для ввода названия
+        // Показываем клавиатуру создания (с кнопкой Отмена)
+        $botService->sendMessage($chatId, $text, $keyboardService->getCreateTaskKeyboard());
     }
 
     /**
-     * Показать проекты
+     * 📁 Показать проекты
      */
     protected function showProjects(
         int $chatId,
@@ -287,13 +306,19 @@ class ProcessTelegramMessage implements ShouldQueue
         $text = TelegramIcons::PROJECT . " <b>Ваши проекты</b>\n\n";
         $text .= "Выберите проект для просмотра задач:";
 
-        $keyboard = $keyboardService->getProjectsListInline($user->id);
+        // Reply Keyboard для проектов
+        $botService->sendMessage($chatId, $text, $keyboardService->getProjectsKeyboard());
 
-        $botService->sendMessage($chatId, $text, $keyboard);
+        // Inline список проектов
+        $botService->sendMessage(
+            $chatId,
+            TelegramIcons::FOLDER . " <b>Список:</b>",
+            $keyboardService->getProjectsListInline($user->id)
+        );
     }
 
     /**
-     * Показать статистику профиля
+     * 📊 Показать статистику профиля
      */
     protected function showProfile(
         int $chatId,
@@ -331,7 +356,6 @@ class ProcessTelegramMessage implements ShouldQueue
         $message .= TelegramIcons::CALENDAR . " За неделю: <b>{$completedThisWeek}</b>\n";
         $message .= TelegramIcons::CALENDAR . " За месяц: <b>{$completedThisMonth}</b>\n";
 
-        // Добавим мотивационное сообщение
         if ($completedThisWeek >= 10) {
             $message .= "\n" . TelegramIcons::FIRE . " <b>Отличный темп!</b>";
         } elseif ($activeTasks == 0) {
@@ -340,11 +364,19 @@ class ProcessTelegramMessage implements ShouldQueue
             $message .= "\n" . TelegramIcons::WARNING . " <i>Есть просроченные задачи</i>";
         }
 
-        $botService->sendMessage($chatId, $message, $keyboardService->getProfileInline());
+        // Reply Keyboard для профиля
+        $botService->sendMessage($chatId, $message, $keyboardService->getProfileKeyboard());
+
+        // Inline кнопки
+        $botService->sendMessage(
+            $chatId,
+            TelegramIcons::TARGET . " <b>Действия:</b>",
+            $keyboardService->getProfileInline()
+        );
     }
 
     /**
-     * Показать настройки
+     * ⚙️ Показать настройки
      */
     protected function showSettings(
         int $chatId,
@@ -352,9 +384,36 @@ class ProcessTelegramMessage implements ShouldQueue
         TelegramKeyboardService $keyboardService
     ): void {
         $text = TelegramIcons::SETTINGS . " <b>Настройки</b>\n\n";
-        $text .= "Управление вашим Telegram-аккаунтом:";
+        $text .= "Управление вашим аккаунтом:";
 
-        $botService->sendMessage($chatId, $text, $keyboardService->getSettingsInline());
+        // Reply Keyboard для настроек
+        $botService->sendMessage($chatId, $text, $keyboardService->getSettingsKeyboard());
+
+        // Inline кнопки настроек
+        $botService->sendMessage(
+            $chatId,
+            TelegramIcons::SETTINGS . " <b>Опции:</b>",
+            $keyboardService->getSettingsInline()
+        );
+    }
+
+    /**
+     * ❓ Показать справку
+     */
+    protected function showHelp(
+        int $chatId,
+        TelegramBotService $botService,
+        TelegramKeyboardService $keyboardService
+    ): void {
+        $helpCommand = new HelpCommand($botService);
+        $helpCommand->sendHelp($chatId);
+
+        // Меняем клавиатуру на справочную
+        $botService->sendMessage(
+            $chatId,
+            TelegramIcons::BULB . " <i>Выберите раздел справки или вернитесь в меню</i>",
+            $keyboardService->getHelpKeyboard()
+        );
     }
 
     /**
@@ -370,31 +429,102 @@ class ProcessTelegramMessage implements ShouldQueue
         TelegramKeyboardService $keyboardService
     ): void {
         $state = $conversationManager->getState($chatId);
+        $action = $state['action'] ?? null;
+        $step = $state['step'] ?? null;
 
-        switch ($state['action'] ?? null) {
+        // Проверяем, не нажал ли пользователь "Отмена"
+        if ($this->cleanButtonText($text) === 'Отмена') {
+            $conversationManager->clearState($chatId);
+            $botService->sendMessage(
+                $chatId,
+                TelegramIcons::ERROR . " Действие отменено.",
+                $keyboardService->getMainMenuKeyboard()
+            );
+            return;
+        }
+
+        switch ($action) {
             case 'create_task':
-                // Пользователь вводит название задачи
-                $task = $taskService->createTask([
-                    'title' => $text,
-                    'user_id' => $user->id,
-                ]);
+                if ($step === 'title') {
+                    // Пользователь ввёл название задачи
+                    $task = $taskService->createTask([
+                        'title' => $text,
+                        'user_id' => $user->id,
+                    ]);
 
-                $conversationManager->clearState($chatId);
+                    $conversationManager->clearState($chatId);
 
-                $botService->sendMessage(
-                    $chatId,
-                    TelegramIcons::SUCCESS . " <b>Задача создана!</b>\n\n" .
-                    TelegramIcons::TASK . " {$task->title}",
-                    $keyboardService->getTaskDetailsInline($task)
-                );
+                    $botService->sendMessage(
+                        $chatId,
+                        TelegramIcons::SUCCESS . " <b>Задача создана!</b>\n\n" .
+                        TelegramIcons::TASK . " {$task->title}",
+                        $keyboardService->getMainMenuKeyboard()
+                    );
+
+                    // Inline кнопки для новой задачи
+                    $botService->sendMessage(
+                        $chatId,
+                        TelegramIcons::TARGET . " <b>Настроить задачу:</b>",
+                        $keyboardService->getTaskDetailsInline($task)
+                    );
+                }
+                break;
+
+            case 'delete_task':
+                // Подтверждение удаления обрабатывается через кнопки Да/Нет
                 break;
 
             default:
                 $conversationManager->clearState($chatId);
                 $botService->sendMessage(
                     $chatId,
-                    "Операция отменена. Используйте кнопки меню для навигации."
+                    "Операция отменена.",
+                    $keyboardService->getMainMenuKeyboard()
                 );
+        }
+    }
+
+    /**
+     * Обработка подтверждения (Да/Нет)
+     */
+    protected function handleConfirmation(
+        int $chatId,
+        bool $confirmed,
+        $user,
+        TelegramBotService $botService,
+        TaskService $taskService,
+        ConversationManager $conversationManager,
+        TelegramKeyboardService $keyboardService
+    ): void {
+        $state = $conversationManager->getState($chatId);
+
+        if (!$state) {
+            $botService->sendMessage(
+                $chatId,
+                "Нет активного действия для подтверждения.",
+                $keyboardService->getMainMenuKeyboard()
+            );
+            return;
+        }
+
+        $conversationManager->clearState($chatId);
+
+        if ($confirmed && isset($state['action']) && $state['action'] === 'delete_task' && isset($state['task_id'])) {
+            $task = Task::where('id', $state['task_id'])->where('user_id', $user->id)->first();
+            if ($task) {
+                $taskService->deleteTask($task);
+                $botService->sendMessage(
+                    $chatId,
+                    TelegramIcons::TASK_DELETE . " Задача удалена.",
+                    $keyboardService->getMainMenuKeyboard()
+                );
+            }
+        } else {
+            $botService->sendMessage(
+                $chatId,
+                TelegramIcons::SUCCESS . " Готово.",
+                $keyboardService->getMainMenuKeyboard()
+            );
         }
     }
 
@@ -404,28 +534,31 @@ class ProcessTelegramMessage implements ShouldQueue
     protected function handleUnknownText(
         int $chatId,
         string $text,
+        $user,
         TelegramBotService $botService,
+        TaskService $taskService,
+        ConversationManager $conversationManager,
         TelegramKeyboardService $keyboardService
     ): void {
-        $message = TelegramIcons::BULB . " Не понял вашу команду.\n\n";
-        $message .= "Используйте <b>кнопки меню</b> внизу экрана\n";
-        $message .= "или одну из команд:\n\n";
-        $message .= "<code>/add {$text}</code> — создать задачу\n";
-        $message .= "<code>/help</code> — справка";
+        // Предлагаем создать задачу с этим текстом
+        $message = TelegramIcons::BULB . " Не понял команду.\n\n";
+        $message .= "Хотите создать задачу с названием:\n";
+        $message .= "<b>«{$text}»</b>?";
+
+        // Сохраняем текст для быстрого создания
+        $hash = substr(md5($text . time()), 0, 8);
+        cache()->put('quickadd_' . $hash, $text, now()->addMinutes(5));
 
         $keyboard = [
             'inline_keyboard' => [
                 [
-                    ['text' => TelegramIcons::TASK_NEW . " Создать задачу «{$text}»", 'callback_data' => 'quickadd_' . substr(md5($text), 0, 8)],
+                    ['text' => TelegramIcons::TASK_NEW . ' Да, создать задачу', 'callback_data' => 'quickadd_' . $hash],
                 ],
                 [
-                    ['text' => TelegramIcons::HELP . ' Помощь', 'callback_data' => 'menu_help'],
+                    ['text' => TelegramIcons::ERROR . ' Нет', 'callback_data' => 'menu_main'],
                 ],
             ],
         ];
-
-        // Сохраним текст для быстрого создания
-        cache()->put('quickadd_' . substr(md5($text), 0, 8), $text, now()->addMinutes(5));
 
         $botService->sendMessage($chatId, $message, $keyboard);
     }
@@ -438,4 +571,3 @@ class ProcessTelegramMessage implements ShouldQueue
         ]);
     }
 }
-
