@@ -496,9 +496,6 @@ class TelegramKeyboardService
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => TelegramIcons::BELL . ' Уведомления', 'callback_data' => 'settings_notifications'],
-                ],
-                [
                     ['text' => TelegramIcons::UNLINK . ' Отвязать аккаунт', 'callback_data' => 'settings_unlink'],
                 ],
                 [

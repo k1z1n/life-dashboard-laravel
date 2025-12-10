@@ -114,60 +114,87 @@ class TelegramTaskService
 
     /**
      * Format tasks list for Telegram message
-     * Кнопки содержат название задачи для понятности
+     * Три кнопки: название | выполнить | детали
+     * С пагинацией
      */
-    public function formatTasksList(Collection $tasks, string $title = 'Задачи'): array
+    public function formatTasksList(Collection $tasks, string $title = 'Задачи', int $page = 1, int $perPage = 5, string $filter = 'active'): array
     {
         if ($tasks->isEmpty()) {
             return [
                 'text' => TelegramIcons::TASK_LIST . " <b>{$title}</b>\n\n" .
-                          TelegramIcons::SPARKLE . " <i>Задач не найдено.</i>\n\n" .
-                          "Нажмите ➕ Создать чтобы добавить задачу.",
+                          TelegramIcons::SPARKLE . " <i>Задач не найдено.</i>",
                 'keyboard' => null,
             ];
         }
 
-        $message = TelegramIcons::TASK_LIST . " <b>{$title}</b> ({$tasks->count()})\n";
-        $message .= "━━━━━━━━━━━━━━━━━━━━\n";
-        $message .= "<i>Нажмите на задачу чтобы выполнить:</i>\n\n";
+        $total = $tasks->count();
+        $totalPages = (int) ceil($total / $perPage);
+        $page = max(1, min($page, $totalPages)); // Ограничиваем page
+
+        $offset = ($page - 1) * $perPage;
+        $tasksOnPage = $tasks->slice($offset, $perPage);
+
+        $message = TelegramIcons::TASK_LIST . " <b>{$title}</b> ({$total})";
+        if ($totalPages > 1) {
+            $message .= " • Страница {$page}/{$totalPages}";
+        }
 
         $keyboard = [];
 
-        // Показываем максимум 8 задач (ограничение Telegram на кнопки)
-        foreach ($tasks->take(8) as $task) {
-            $icon = TelegramIcons::getTaskStatusIcon($task->completed);
-
+        // Три кнопки для каждой задачи в одной строке: название | выполнить | детали
+        foreach ($tasksOnPage as $task) {
             $priorityIcon = '';
             if ($task->priority) {
                 $priorityIcon = TelegramIcons::getPriorityIcon($task->priority->order) . ' ';
             }
 
-            // Короткое название для кнопки (макс 25 символов)
-            $shortTitle = mb_strlen($task->title) > 22 
-                ? mb_substr($task->title, 0, 22) . '…' 
+            // Короткое название (макс 14 символов для кнопки)
+            $shortTitle = mb_strlen($task->title) > 14
+                ? mb_substr($task->title, 0, 14) . '…'
                 : $task->title;
 
-            // Кнопка с названием задачи
-            $btnIcon = $task->completed ? '↩️' : '✅';
+            // Три кнопки в одной строке с текстом
+            $completeBtn = $task->completed
+                ? ['text' => 'Вернуть', 'callback_data' => "task_uncomplete_{$task->id}"]
+                : ['text' => 'Готово', 'callback_data' => "task_complete_{$task->id}"];
+
             $keyboard[] = [
                 [
-                    'text' => "{$btnIcon} {$priorityIcon}{$shortTitle}",
-                    'callback_data' => $task->completed ? "task_uncomplete_{$task->id}" : "task_complete_{$task->id}"
+                    'text' => "{$priorityIcon}{$shortTitle}",
+                    'callback_data' => "task_view_{$task->id}"
                 ],
+                $completeBtn,
                 [
-                    'text' => 'ℹ️',
+                    'text' => 'Детали',
                     'callback_data' => "task_details_{$task->id}"
                 ],
             ];
         }
 
-        if ($tasks->count() > 8) {
-            $message .= "<i>... и еще " . ($tasks->count() - 8) . " задач (откройте сайт)</i>\n";
+        // Пагинация
+        if ($totalPages > 1) {
+            $paginationRow = [];
+
+            if ($page > 1) {
+                $prevPage = $page - 1;
+                $paginationRow[] = ['text' => '◀️ Назад', 'callback_data' => "page_{$filter}_{$prevPage}"];
+            }
+
+            if ($page < $totalPages) {
+                $nextPage = $page + 1;
+                $paginationRow[] = ['text' => 'Вперёд ▶️', 'callback_data' => "page_{$filter}_{$nextPage}"];
+            }
+
+            if (!empty($paginationRow)) {
+                $keyboard[] = $paginationRow;
+            }
         }
 
         return [
             'text' => $message,
             'keyboard' => $keyboard,
+            'page' => $page,
+            'total_pages' => $totalPages,
         ];
     }
 

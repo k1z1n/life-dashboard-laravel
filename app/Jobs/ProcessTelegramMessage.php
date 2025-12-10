@@ -248,7 +248,7 @@ class ProcessTelegramMessage implements ShouldQueue
         ];
 
         $tasks = $telegramTaskService->getTasksList($user, $filter);
-        $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи');
+            $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи', 1, 5, $filter);
 
         // Собираем inline клавиатуру: сначала кнопки задач, потом фильтры
         $inlineKeyboard = ['inline_keyboard' => []];
