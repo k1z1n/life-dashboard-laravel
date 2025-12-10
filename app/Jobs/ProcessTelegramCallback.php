@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\DTOs\TaskDTO;
 use App\Exceptions\Telegram\TaskNotFoundException;
 use App\Exceptions\Telegram\UnauthorizedException;
 use App\Models\Task;
@@ -698,10 +699,11 @@ class ProcessTelegramCallback implements ShouldQueue
             return;
         }
 
-        $task = $taskService->createTask([
+        $dto = TaskDTO::fromArray([
             'title' => $title,
             'user_id' => $user->id,
         ]);
+        $task = $taskService->createTask($dto);
 
         $botService->sendMessage(
             $chatId,
