@@ -18,13 +18,15 @@ class TelegramTaskService
 
         switch ($filter) {
             case 'today':
-                $query->where(function ($q) {
-                    $q->where('completed', false)
-                        ->orWhere(function ($subQ) {
-                            $subQ->where('completed', true)
-                                ->whereDate('completed_at', today());
-                        });
-                })->whereDate('due_date', today());
+                // Задачи на сегодня: невыполненные + выполненные сегодня (та же логика что на сайте)
+                $query->whereDate('due_date', today())
+                    ->where(function ($q) {
+                        $q->where('completed', false)
+                            ->orWhere(function ($subQ) {
+                                $subQ->where('completed', true)
+                                    ->whereDate('completed_at', '>=', now()->startOfDay());
+                            });
+                    });
                 break;
 
             case 'overdue':
@@ -39,6 +41,7 @@ class TelegramTaskService
 
             case 'active':
             default:
+                // Та же логика что на сайте: невыполненные + выполненные сегодня
                 $query->where(function ($q) {
                     $q->where('completed', false)
                         ->orWhere(function ($subQ) {
@@ -114,7 +117,7 @@ class TelegramTaskService
 
     /**
      * Format tasks list for Telegram message
-     * Три кнопки: название | выполнить | детали
+     * Только активные задачи, название на всю ширину, полный текст
      * С пагинацией
      */
     public function formatTasksList(Collection $tasks, string $title = 'Задачи', int $page = 1, int $perPage = 5, string $filter = 'active'): array
@@ -141,28 +144,35 @@ class TelegramTaskService
 
         $keyboard = [];
 
-        // Три кнопки для каждой задачи в одной строке: название | выполнить | детали
+        // Для каждой задачи: название на всю ширину, потом кнопки действий
         foreach ($tasksOnPage as $task) {
             $priorityIcon = '';
             if ($task->priority) {
                 $priorityIcon = TelegramIcons::getPriorityIcon($task->priority->order) . ' ';
             }
 
-            // Короткое название (макс 14 символов для кнопки)
-            $shortTitle = mb_strlen($task->title) > 14
-                ? mb_substr($task->title, 0, 14) . '…'
+            // Иконка статуса
+            $statusIcon = $task->completed ? TelegramIcons::TASK_DONE . ' ' : '';
+
+            // Полное название задачи (макс 60 символов - это максимум для кнопки Telegram)
+            $fullTitle = mb_strlen($task->title) > 60
+                ? mb_substr($task->title, 0, 57) . '...'
                 : $task->title;
 
-            // Три кнопки в одной строке с текстом
+            // Название задачи на всю ширину (с иконкой статуса для выполненных)
+            $keyboard[] = [
+                [
+                    'text' => "{$statusIcon}{$priorityIcon}{$fullTitle}",
+                    'callback_data' => "task_view_{$task->id}"
+                ],
+            ];
+
+            // Кнопки действий в одной строке
             $completeBtn = $task->completed
                 ? ['text' => 'Вернуть', 'callback_data' => "task_uncomplete_{$task->id}"]
                 : ['text' => 'Готово', 'callback_data' => "task_complete_{$task->id}"];
 
             $keyboard[] = [
-                [
-                    'text' => "{$priorityIcon}{$shortTitle}",
-                    'callback_data' => "task_view_{$task->id}"
-                ],
                 $completeBtn,
                 [
                     'text' => 'Детали',
