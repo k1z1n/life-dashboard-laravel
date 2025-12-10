@@ -114,6 +114,7 @@ class TelegramTaskService
 
     /**
      * Format tasks list for Telegram message
+     * Кнопки содержат название задачи для понятности
      */
     public function formatTasksList(Collection $tasks, string $title = 'Задачи'): array
     {
@@ -121,62 +122,47 @@ class TelegramTaskService
             return [
                 'text' => TelegramIcons::TASK_LIST . " <b>{$title}</b>\n\n" .
                           TelegramIcons::SPARKLE . " <i>Задач не найдено.</i>\n\n" .
-                          "Создайте новую задачу!",
+                          "Нажмите ➕ Создать чтобы добавить задачу.",
                 'keyboard' => null,
             ];
         }
 
         $message = TelegramIcons::TASK_LIST . " <b>{$title}</b> ({$tasks->count()})\n";
-        $message .= "━━━━━━━━━━━━━━━━━━━━\n\n";
+        $message .= "━━━━━━━━━━━━━━━━━━━━\n";
+        $message .= "<i>Нажмите на задачу чтобы выполнить:</i>\n\n";
 
         $keyboard = [];
 
-        foreach ($tasks->take(10) as $index => $task) {
-            $num = $index + 1;
+        // Показываем максимум 8 задач (ограничение Telegram на кнопки)
+        foreach ($tasks->take(8) as $task) {
             $icon = TelegramIcons::getTaskStatusIcon($task->completed);
-            $taskTitle = $task->completed ? "~{$task->title}~" : $task->title;
 
             $priorityIcon = '';
             if ($task->priority) {
                 $priorityIcon = TelegramIcons::getPriorityIcon($task->priority->order) . ' ';
             }
 
-            // Информация о проекте и дате
-            $meta = [];
-            if ($task->project) {
-                $meta[] = $task->project->name;
-            }
-            if ($task->due_date) {
-                if ($task->due_date->isToday()) {
-                    $meta[] = 'сегодня';
-                } elseif ($task->due_date->isTomorrow()) {
-                    $meta[] = 'завтра';
-                } elseif (!$task->completed && $task->due_date->isPast()) {
-                    $meta[] = TelegramIcons::OVERDUE;
-                } else {
-                    $meta[] = $task->due_date->format('d.m');
-                }
-            }
+            // Короткое название для кнопки (макс 25 символов)
+            $shortTitle = mb_strlen($task->title) > 22 
+                ? mb_substr($task->title, 0, 22) . '…' 
+                : $task->title;
 
-            $metaStr = $meta ? ' • ' . implode(' • ', $meta) : '';
-
-            $message .= "<b>{$num}.</b> {$icon} {$priorityIcon}{$taskTitle}{$metaStr}\n";
-
-            // Inline keyboard buttons for each task
+            // Кнопка с названием задачи
+            $btnIcon = $task->completed ? '↩️' : '✅';
             $keyboard[] = [
                 [
-                    'text' => $task->completed ? TelegramIcons::BACK . ' Вернуть' : TelegramIcons::TASK_DONE,
+                    'text' => "{$btnIcon} {$priorityIcon}{$shortTitle}",
                     'callback_data' => $task->completed ? "task_uncomplete_{$task->id}" : "task_complete_{$task->id}"
                 ],
                 [
-                    'text' => TelegramIcons::INFO . ' Детали',
+                    'text' => 'ℹ️',
                     'callback_data' => "task_details_{$task->id}"
                 ],
             ];
         }
 
-        if ($tasks->count() > 10) {
-            $message .= "\n<i>... и еще " . ($tasks->count() - 10) . " задач</i>";
+        if ($tasks->count() > 8) {
+            $message .= "<i>... и еще " . ($tasks->count() - 8) . " задач (откройте сайт)</i>\n";
         }
 
         return [

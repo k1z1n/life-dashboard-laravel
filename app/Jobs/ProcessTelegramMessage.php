@@ -250,26 +250,23 @@ class ProcessTelegramMessage implements ShouldQueue
         $tasks = $telegramTaskService->getTasksList($user, $filter);
         $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи');
 
-        // Inline фильтры + кнопки задач
-        $inlineKeyboard = $keyboardService->getTasksFiltersInline($filter);
+        // Собираем inline клавиатуру: сначала кнопки задач, потом фильтры
+        $inlineKeyboard = ['inline_keyboard' => []];
+
+        // Добавляем кнопки задач (если есть)
         if ($formatted['keyboard']) {
-            $inlineKeyboard['inline_keyboard'] = array_merge(
-                $formatted['keyboard'],
-                $inlineKeyboard['inline_keyboard']
-            );
+            $inlineKeyboard['inline_keyboard'] = $formatted['keyboard'];
         }
 
-        // Отправляем с Reply Keyboard для списка + Inline кнопки
-        $botService->sendMessage($chatId, $formatted['text'], $keyboardService->getTasksListKeyboard());
+        // Добавляем фильтры внизу
+        $filters = $keyboardService->getTasksFiltersInline($filter);
+        $inlineKeyboard['inline_keyboard'] = array_merge(
+            $inlineKeyboard['inline_keyboard'],
+            $filters['inline_keyboard']
+        );
 
-        // И отдельно inline кнопки
-        if (!empty($inlineKeyboard['inline_keyboard'])) {
-            $botService->sendMessage(
-                $chatId,
-                TelegramIcons::TARGET . " <b>Действия:</b>",
-                $inlineKeyboard
-            );
-        }
+        // Отправляем ОДНО сообщение со списком и кнопками
+        $botService->sendMessage($chatId, $formatted['text'], $inlineKeyboard);
     }
 
     /**
@@ -304,15 +301,8 @@ class ProcessTelegramMessage implements ShouldQueue
         $text = TelegramIcons::PROJECT . " <b>Ваши проекты</b>\n\n";
         $text .= "Выберите проект для просмотра задач:";
 
-        // Reply Keyboard для проектов
-        $botService->sendMessage($chatId, $text, $keyboardService->getProjectsKeyboard());
-
-        // Inline список проектов
-        $botService->sendMessage(
-            $chatId,
-            TelegramIcons::FOLDER . " <b>Список:</b>",
-            $keyboardService->getProjectsListInline($user->id)
-        );
+        // Одно сообщение с inline кнопками проектов
+        $botService->sendMessage($chatId, $text, $keyboardService->getProjectsListInline($user->id));
     }
 
     /**
@@ -362,15 +352,8 @@ class ProcessTelegramMessage implements ShouldQueue
             $message .= "\n" . TelegramIcons::WARNING . " <i>Есть просроченные задачи</i>";
         }
 
-        // Reply Keyboard для профиля
-        $botService->sendMessage($chatId, $message, $keyboardService->getProfileKeyboard());
-
-        // Inline кнопки
-        $botService->sendMessage(
-            $chatId,
-            TelegramIcons::TARGET . " <b>Действия:</b>",
-            $keyboardService->getProfileInline()
-        );
+        // Одно сообщение с inline кнопками
+        $botService->sendMessage($chatId, $message, $keyboardService->getProfileInline());
     }
 
     /**
@@ -384,15 +367,8 @@ class ProcessTelegramMessage implements ShouldQueue
         $text = TelegramIcons::SETTINGS . " <b>Настройки</b>\n\n";
         $text .= "Управление вашим аккаунтом:";
 
-        // Reply Keyboard для настроек
-        $botService->sendMessage($chatId, $text, $keyboardService->getSettingsKeyboard());
-
-        // Inline кнопки настроек
-        $botService->sendMessage(
-            $chatId,
-            TelegramIcons::SETTINGS . " <b>Опции:</b>",
-            $keyboardService->getSettingsInline()
-        );
+        // Одно сообщение с inline кнопками
+        $botService->sendMessage($chatId, $text, $keyboardService->getSettingsInline());
     }
 
     /**
@@ -405,13 +381,6 @@ class ProcessTelegramMessage implements ShouldQueue
     ): void {
         $helpCommand = new HelpCommand($botService);
         $helpCommand->sendHelp($chatId);
-
-        // Меняем клавиатуру на справочную
-        $botService->sendMessage(
-            $chatId,
-            TelegramIcons::BULB . " <i>Выберите раздел справки или вернитесь в меню</i>",
-            $keyboardService->getHelpKeyboard()
-        );
     }
 
     /**
