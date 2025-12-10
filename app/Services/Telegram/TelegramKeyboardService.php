@@ -7,16 +7,22 @@ use App\Models\Project;
 use App\Models\Priority;
 
 /**
- * Сервис для создания клавиатур Telegram
- * Reply Keyboard — постоянные кнопки внизу экрана
+ * Сервис для создания контекстных клавиатур Telegram
+ * 
+ * Reply Keyboard — постоянные кнопки внизу экрана (меняются по контексту)
  * Inline Keyboard — кнопки под сообщениями
  */
 class TelegramKeyboardService
 {
+    // ═══════════════════════════════════════════════════════════════
+    // REPLY KEYBOARDS (кнопки внизу экрана)
+    // ═══════════════════════════════════════════════════════════════
+
     /**
-     * Главное меню (Reply Keyboard) — постоянные кнопки внизу
+     * 🏠 ГЛАВНОЕ МЕНЮ
+     * Показывается после /start, /menu или возврата в меню
      */
-    public function getMainMenu(): array
+    public function getMainMenuKeyboard(): array
     {
         return [
             'keyboard' => [
@@ -25,7 +31,7 @@ class TelegramKeyboardService
                     ['text' => TelegramIcons::TODAY . ' Сегодня'],
                 ],
                 [
-                    ['text' => TelegramIcons::TASK_NEW . ' Создать задачу'],
+                    ['text' => TelegramIcons::TASK_NEW . ' Создать'],
                     ['text' => TelegramIcons::OVERDUE . ' Просрочено'],
                 ],
                 [
@@ -43,7 +49,181 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline меню быстрых действий
+     * 📋 СПИСОК ЗАДАЧ
+     * Показывается при просмотре списка задач
+     */
+    public function getTasksListKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::TASK_LIST . ' Все'],
+                    ['text' => TelegramIcons::TODAY . ' Сегодня'],
+                    ['text' => TelegramIcons::TASK_DONE . ' Готово'],
+                ],
+                [
+                    ['text' => TelegramIcons::TASK_NEW . ' Создать'],
+                    ['text' => TelegramIcons::REFRESH . ' Обновить'],
+                ],
+                [
+                    ['text' => TelegramIcons::HOME . ' Главное меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * ➕ СОЗДАНИЕ ЗАДАЧИ
+     * Показывается когда пользователь создаёт задачу
+     */
+    public function getCreateTaskKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::ERROR . ' Отмена'],
+                ],
+                [
+                    ['text' => TelegramIcons::HOME . ' Главное меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * 📝 ДЕТАЛИ ЗАДАЧИ
+     * Показывается при просмотре конкретной задачи
+     */
+    public function getTaskDetailsKeyboard(bool $isCompleted = false): array
+    {
+        $completeBtn = $isCompleted 
+            ? ['text' => TelegramIcons::BACK . ' Вернуть']
+            : ['text' => TelegramIcons::TASK_DONE . ' Выполнить'];
+
+        return [
+            'keyboard' => [
+                [
+                    $completeBtn,
+                    ['text' => TelegramIcons::TASK_DELETE . ' Удалить'],
+                ],
+                [
+                    ['text' => TelegramIcons::BACK . ' К списку'],
+                    ['text' => TelegramIcons::HOME . ' Меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * 📁 ПРОЕКТЫ
+     * Показывается при просмотре проектов
+     */
+    public function getProjectsKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::REFRESH . ' Обновить'],
+                ],
+                [
+                    ['text' => TelegramIcons::BACK . ' Назад'],
+                    ['text' => TelegramIcons::HOME . ' Главное меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * 📊 СТАТИСТИКА / ПРОФИЛЬ
+     */
+    public function getProfileKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::TASK_LIST . ' Мои задачи'],
+                    ['text' => TelegramIcons::REFRESH . ' Обновить'],
+                ],
+                [
+                    ['text' => TelegramIcons::HOME . ' Главное меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * ⚙️ НАСТРОЙКИ
+     */
+    public function getSettingsKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::BACK . ' Назад'],
+                    ['text' => TelegramIcons::HOME . ' Главное меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * ❓ СПРАВКА
+     */
+    public function getHelpKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::TASK_LIST . ' Мои задачи'],
+                    ['text' => TelegramIcons::TASK_NEW . ' Создать'],
+                ],
+                [
+                    ['text' => TelegramIcons::HOME . ' Главное меню'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * ⚠️ ПОДТВЕРЖДЕНИЕ (удаление и т.п.)
+     */
+    public function getConfirmKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [
+                    ['text' => TelegramIcons::SUCCESS . ' Да'],
+                    ['text' => TelegramIcons::ERROR . ' Нет'],
+                ],
+                [
+                    ['text' => TelegramIcons::BACK . ' Отмена'],
+                ],
+            ],
+            'resize_keyboard' => true,
+        ];
+    }
+
+    /**
+     * Убрать клавиатуру
+     */
+    public function removeKeyboard(): array
+    {
+        return ['remove_keyboard' => true];
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // INLINE KEYBOARDS (кнопки под сообщениями)
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Inline меню быстрых действий (под приветствием)
      */
     public function getQuickActionsInline(): array
     {
@@ -62,37 +242,36 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки для списка задач
+     * Inline фильтры для списка задач
      */
-    public function getTasksListInline(string $currentFilter = 'active'): array
+    public function getTasksFiltersInline(string $currentFilter = 'active'): array
     {
-        $buttons = [
-            [
-                [
-                    'text' => ($currentFilter === 'active' ? '• ' : '') . 'Активные',
-                    'callback_data' => 'filter_active'
-                ],
-                [
-                    'text' => ($currentFilter === 'today' ? '• ' : '') . 'Сегодня',
-                    'callback_data' => 'filter_today'
-                ],
-            ],
-            [
-                [
-                    'text' => ($currentFilter === 'completed' ? '• ' : '') . 'Выполненные',
-                    'callback_data' => 'filter_completed'
-                ],
-                [
-                    'text' => ($currentFilter === 'overdue' ? '• ' : '') . 'Просрочено',
-                    'callback_data' => 'filter_overdue'
-                ],
-            ],
-            [
-                ['text' => TelegramIcons::TASK_NEW . ' Создать задачу', 'callback_data' => 'menu_add'],
-            ],
-            [
-                ['text' => TelegramIcons::REFRESH . ' Обновить', 'callback_data' => 'refresh_tasks'],
-            ],
+        $filters = [
+            'active' => 'Активные',
+            'today' => 'Сегодня',
+            'completed' => 'Готово',
+            'overdue' => 'Просрочено',
+        ];
+
+        $buttons = [];
+        $row = [];
+        foreach ($filters as $key => $label) {
+            $text = ($currentFilter === $key ? '• ' : '') . $label;
+            $row[] = ['text' => $text, 'callback_data' => "filter_{$key}"];
+            if (count($row) === 2) {
+                $buttons[] = $row;
+                $row = [];
+            }
+        }
+        if (!empty($row)) {
+            $buttons[] = $row;
+        }
+
+        $buttons[] = [
+            ['text' => TelegramIcons::TASK_NEW . ' Создать задачу', 'callback_data' => 'menu_add'],
+        ];
+        $buttons[] = [
+            ['text' => TelegramIcons::REFRESH . ' Обновить', 'callback_data' => 'refresh_tasks'],
         ];
 
         return ['inline_keyboard' => $buttons];
@@ -101,15 +280,15 @@ class TelegramKeyboardService
     /**
      * Inline кнопки для конкретной задачи в списке
      */
-    public function getTaskRowButtons(Task $task): array
+    public function getTaskRowInline(Task $task): array
     {
         $completeBtn = $task->completed
-            ? ['text' => TelegramIcons::BACK . ' Вернуть', 'callback_data' => "task_uncomplete_{$task->id}"]
-            : ['text' => TelegramIcons::TASK_DONE . ' Готово', 'callback_data' => "task_complete_{$task->id}"];
+            ? ['text' => TelegramIcons::BACK, 'callback_data' => "task_uncomplete_{$task->id}"]
+            : ['text' => TelegramIcons::TASK_DONE, 'callback_data' => "task_complete_{$task->id}"];
 
         return [
             $completeBtn,
-            ['text' => TelegramIcons::INFO . ' Детали', 'callback_data' => "task_details_{$task->id}"],
+            ['text' => TelegramIcons::INFO, 'callback_data' => "task_details_{$task->id}"],
         ];
     }
 
@@ -124,7 +303,7 @@ class TelegramKeyboardService
         $buttons[] = [
             $task->completed
                 ? ['text' => TelegramIcons::BACK . ' Вернуть в работу', 'callback_data' => "task_uncomplete_{$task->id}"]
-                : ['text' => TelegramIcons::TASK_DONE . ' Отметить выполненной', 'callback_data' => "task_complete_{$task->id}"],
+                : ['text' => TelegramIcons::TASK_DONE . ' Выполнить', 'callback_data' => "task_complete_{$task->id}"],
         ];
 
         // Редактирование
@@ -149,7 +328,7 @@ class TelegramKeyboardService
     }
 
     /**
-     * Подтверждение удаления задачи
+     * Подтверждение удаления задачи (inline)
      */
     public function getDeleteConfirmInline(int $taskId): array
     {
@@ -164,7 +343,7 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки выбора приоритета
+     * Inline выбор приоритета
      */
     public function getPrioritySelectInline(int $taskId, ?int $currentPriorityId = null): array
     {
@@ -182,7 +361,6 @@ class TelegramKeyboardService
         $buttons[] = [
             ['text' => TelegramIcons::PRIORITY_NONE . ' Без приоритета', 'callback_data' => "setpriority_{$taskId}_0"],
         ];
-
         $buttons[] = [
             ['text' => TelegramIcons::BACK . ' Назад', 'callback_data' => "task_details_{$taskId}"],
         ];
@@ -191,7 +369,7 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки выбора проекта
+     * Inline выбор проекта
      */
     public function getProjectSelectInline(int $taskId, int $userId, ?int $currentProjectId = null): array
     {
@@ -208,7 +386,6 @@ class TelegramKeyboardService
         $buttons[] = [
             ['text' => TelegramIcons::INBOX . ' Входящие (без проекта)', 'callback_data' => "setproject_{$taskId}_0"],
         ];
-
         $buttons[] = [
             ['text' => TelegramIcons::BACK . ' Назад', 'callback_data' => "task_details_{$taskId}"],
         ];
@@ -217,7 +394,7 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки выбора даты
+     * Inline выбор даты
      */
     public function getDateSelectInline(int $taskId): array
     {
@@ -239,14 +416,14 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки для создания задачи (после ввода названия)
+     * Inline для создания задачи (после ввода названия)
      */
     public function getNewTaskOptionsInline(string $sessionId): array
     {
         return [
             'inline_keyboard' => [
                 [
-                    ['text' => TelegramIcons::TASK_DONE . ' Создать сейчас', 'callback_data' => "newtask_create_{$sessionId}"],
+                    ['text' => TelegramIcons::TASK_DONE . ' Создать', 'callback_data' => "newtask_create_{$sessionId}"],
                 ],
                 [
                     ['text' => TelegramIcons::PRIORITY . ' Приоритет', 'callback_data' => "newtask_priority_{$sessionId}"],
@@ -254,7 +431,6 @@ class TelegramKeyboardService
                 ],
                 [
                     ['text' => TelegramIcons::CALENDAR . ' Срок', 'callback_data' => "newtask_date_{$sessionId}"],
-                    ['text' => TelegramIcons::TASK . ' Описание', 'callback_data' => "newtask_desc_{$sessionId}"],
                 ],
                 [
                     ['text' => TelegramIcons::ERROR . ' Отмена', 'callback_data' => 'newtask_cancel'],
@@ -264,7 +440,7 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки статистики
+     * Inline для статистики/профиля
      */
     public function getProfileInline(): array
     {
@@ -285,7 +461,7 @@ class TelegramKeyboardService
     }
 
     /**
-     * Inline кнопки для списка проектов
+     * Inline для списка проектов
      */
     public function getProjectsListInline(int $userId): array
     {
@@ -309,15 +485,11 @@ class TelegramKeyboardService
             ['text' => TelegramIcons::INBOX . ' Входящие (без проекта)', 'callback_data' => 'project_tasks_0'],
         ];
 
-        $buttons[] = [
-            ['text' => TelegramIcons::PROJECT_NEW . ' Создать проект', 'callback_data' => 'project_new'],
-        ];
-
         return ['inline_keyboard' => $buttons];
     }
 
     /**
-     * Настройки пользователя
+     * Inline для настроек
      */
     public function getSettingsInline(): array
     {
@@ -332,15 +504,12 @@ class TelegramKeyboardService
                 [
                     ['text' => TelegramIcons::WEB . ' Открыть сайт', 'url' => config('app.url')],
                 ],
-                [
-                    ['text' => TelegramIcons::BACK . ' Назад', 'callback_data' => 'menu_main'],
-                ],
             ],
         ];
     }
 
     /**
-     * Помощь
+     * Inline для справки
      */
     public function getHelpInline(): array
     {
@@ -355,19 +524,7 @@ class TelegramKeyboardService
                 [
                     ['text' => TelegramIcons::LINK . ' Как привязать аккаунт?', 'callback_data' => 'help_link'],
                 ],
-                [
-                    ['text' => TelegramIcons::BACK . ' Главное меню', 'callback_data' => 'menu_main'],
-                ],
             ],
         ];
     }
-
-    /**
-     * Убрать клавиатуру
-     */
-    public function removeKeyboard(): array
-    {
-        return ['remove_keyboard' => true];
-    }
 }
-
