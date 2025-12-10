@@ -8,6 +8,7 @@ use App\Services\Telegram\Commands\CompleteCommand;
 use App\Services\Telegram\Commands\CompletedCommand;
 use App\Services\Telegram\Commands\DetailsCommand;
 use App\Services\Telegram\Commands\HelpCommand;
+use App\Services\Telegram\Commands\MenuCommand;
 use App\Services\Telegram\Commands\OverdueCommand;
 use App\Services\Telegram\Commands\PrioritiesCommand;
 use App\Services\Telegram\Commands\ProfileCommand;
@@ -36,6 +37,7 @@ class CommandHandler
         $this->commands = [
             'start' => new StartCommand($this->botService, $this->authService),
             'help' => new HelpCommand($this->botService),
+            'menu' => new MenuCommand($this->botService, $this->authService),
             'tasks' => new TasksCommand($this->botService, $this->authService, $this->taskService),
             'today' => new TodayCommand($this->botService, $this->authService, $this->taskService),
             'completed' => new CompletedCommand($this->botService, $this->authService, $this->taskService),
