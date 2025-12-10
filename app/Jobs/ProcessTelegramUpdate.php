@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\ProcessTelegramCallback;
 use App\Jobs\ProcessTelegramCommand;
+use App\Jobs\ProcessTelegramMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +37,7 @@ class ProcessTelegramUpdate implements ShouldQueue
                 'update_id' => $this->update['update_id'] ?? null,
             ]);
 
-            // Handle callback query
+            // Handle callback query (inline кнопки)
             if (isset($this->update['callback_query'])) {
                 ProcessTelegramCallback::dispatch($this->update['callback_query'])
                     ->onQueue('telegram-callbacks');
@@ -47,15 +48,19 @@ class ProcessTelegramUpdate implements ShouldQueue
             if (isset($this->update['message'])) {
                 $message = $this->update['message'];
 
-                // Handle command
+                // Handle command (начинается с /)
                 if (isset($message['text']) && str_starts_with($message['text'], '/')) {
                     ProcessTelegramCommand::dispatch($message)
                         ->onQueue('telegram-commands');
                     return;
                 }
 
-                // Handle text message (conversation)
-                // TODO: Implement conversation handling
+                // Handle text message (Reply Keyboard или обычный текст)
+                if (isset($message['text'])) {
+                    ProcessTelegramMessage::dispatch($message)
+                        ->onQueue('telegram-messages');
+                    return;
+                }
             }
 
             Log::channel('telegram')->debug('Update type not handled', [
