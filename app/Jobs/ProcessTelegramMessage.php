@@ -281,10 +281,7 @@ class ProcessTelegramMessage implements ShouldQueue
         TelegramKeyboardService $keyboardService
     ): void {
         // Устанавливаем состояние диалога
-        $conversationManager->setState($chatId, [
-            'action' => 'create_task',
-            'step' => 'title',
-        ]);
+        $conversationManager->setState($chatId, 'create_task', ['step' => 'title']);
 
         $text = TelegramIcons::TASK_NEW . " <b>Создание задачи</b>\n\n";
         $text .= "Введите название новой задачи:\n\n";
@@ -428,9 +425,9 @@ class ProcessTelegramMessage implements ShouldQueue
         ConversationManager $conversationManager,
         TelegramKeyboardService $keyboardService
     ): void {
-        $state = $conversationManager->getState($chatId);
-        $action = $state['action'] ?? null;
-        $step = $state['step'] ?? null;
+        $currentState = $conversationManager->getCurrentState($chatId);
+        $data = $conversationManager->getData($chatId);
+        $step = $data['step'] ?? null;
 
         // Проверяем, не нажал ли пользователь "Отмена"
         if ($this->cleanButtonText($text) === 'Отмена') {
@@ -443,7 +440,7 @@ class ProcessTelegramMessage implements ShouldQueue
             return;
         }
 
-        switch ($action) {
+        switch ($currentState) {
             case 'create_task':
                 if ($step === 'title') {
                     // Пользователь ввёл название задачи
@@ -496,9 +493,10 @@ class ProcessTelegramMessage implements ShouldQueue
         ConversationManager $conversationManager,
         TelegramKeyboardService $keyboardService
     ): void {
-        $state = $conversationManager->getState($chatId);
+        $currentState = $conversationManager->getCurrentState($chatId);
+        $data = $conversationManager->getData($chatId);
 
-        if (!$state) {
+        if (!$currentState) {
             $botService->sendMessage(
                 $chatId,
                 "Нет активного действия для подтверждения.",
@@ -509,8 +507,8 @@ class ProcessTelegramMessage implements ShouldQueue
 
         $conversationManager->clearState($chatId);
 
-        if ($confirmed && isset($state['action']) && $state['action'] === 'delete_task' && isset($state['task_id'])) {
-            $task = Task::where('id', $state['task_id'])->where('user_id', $user->id)->first();
+        if ($confirmed && $currentState === 'delete_task' && isset($data['task_id'])) {
+            $task = Task::where('id', $data['task_id'])->where('user_id', $user->id)->first();
             if ($task) {
                 $taskService->deleteTask($task);
                 $botService->sendMessage(
