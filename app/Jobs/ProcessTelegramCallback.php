@@ -130,7 +130,17 @@ class ProcessTelegramCallback implements ShouldQueue
             // ═══════════════════════════════════════
             case 'filter':
                 $filter = $parts[1] ?? 'active';
-                $this->showFilteredTasks($filter, $chatId, $messageId, $user, $botService, $telegramTaskService);
+                $this->showFilteredTasks($filter, $chatId, $messageId, $user, $botService, $telegramTaskService, 1);
+                $botService->answerCallbackQuery($callbackQueryId);
+                break;
+
+            // ═══════════════════════════════════════
+            // ПАГИНАЦИЯ
+            // ═══════════════════════════════════════
+            case 'page':
+                $filter = $parts[1] ?? 'active';
+                $page = (int) ($parts[2] ?? 1);
+                $this->showFilteredTasks($filter, $chatId, $messageId, $user, $botService, $telegramTaskService, $page);
                 $botService->answerCallbackQuery($callbackQueryId);
                 break;
 
@@ -366,6 +376,12 @@ class ProcessTelegramCallback implements ShouldQueue
                 $this->refreshTasksList($chatId, $messageId, $user, $botService, $telegramTaskService);
                 break;
 
+            case 'view':
+                // Нажатие на название задачи - открываем детали
+                $this->showTaskDetails($task, $chatId, $messageId, $botService, $telegramTaskService);
+                $botService->answerCallbackQuery($callbackQueryId);
+                break;
+
             case 'details':
                 $this->showTaskDetails($task, $chatId, $messageId, $botService, $telegramTaskService);
                 $botService->answerCallbackQuery($callbackQueryId);
@@ -579,7 +595,8 @@ class ProcessTelegramCallback implements ShouldQueue
         int $messageId,
         $user,
         TelegramBotService $botService,
-        TelegramTaskService $telegramTaskService
+        TelegramTaskService $telegramTaskService,
+        int $page = 1
     ): void {
         $titles = [
             'active' => 'Все задачи',
@@ -589,12 +606,20 @@ class ProcessTelegramCallback implements ShouldQueue
         ];
 
         $tasks = $telegramTaskService->getTasksList($user, $filter);
-        $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи');
+        $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи', $page, 5, $filter);
 
-        $keyboard = $this->keyboardService->getTasksListInline($filter);
+        // Собираем клавиатуру: задачи + фильтры
+        $keyboard = ['inline_keyboard' => []];
         if ($formatted['keyboard']) {
-            $keyboard['inline_keyboard'] = array_merge($formatted['keyboard'], $keyboard['inline_keyboard']);
+            $keyboard['inline_keyboard'] = $formatted['keyboard'];
         }
+
+        // Добавляем фильтры внизу
+        $filters = $this->keyboardService->getTasksFiltersInline($filter);
+        $keyboard['inline_keyboard'] = array_merge(
+            $keyboard['inline_keyboard'],
+            $filters['inline_keyboard']
+        );
 
         try {
             $botService->editMessage($chatId, $messageId, $formatted['text'], $keyboard);
@@ -640,20 +665,6 @@ class ProcessTelegramCallback implements ShouldQueue
         TelegramAuthService $authService
     ): void {
         switch ($action) {
-            case 'notifications':
-                $botService->sendMessage(
-                    $chatId,
-                    TelegramIcons::BELL . " <b>Уведомления</b>\n\n" .
-                    "Настройка уведомлений доступна в веб-версии.",
-                    [
-                        'inline_keyboard' => [
-                            [['text' => TelegramIcons::WEB . ' Открыть настройки', 'url' => config('app.url') . '/settings']],
-                            [['text' => TelegramIcons::BACK . ' Назад', 'callback_data' => 'menu_settings']],
-                        ],
-                    ]
-                );
-                break;
-
             case 'unlink':
                 $botService->sendMessage(
                     $chatId,
@@ -779,15 +790,23 @@ class ProcessTelegramCallback implements ShouldQueue
         int $messageId,
         $user,
         TelegramBotService $botService,
-        TelegramTaskService $telegramTaskService
+        TelegramTaskService $telegramTaskService,
+        int $page = 1
     ): void {
         $tasks = $telegramTaskService->getTasksList($user, 'active');
-        $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи');
+        $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи', $page, 5, 'active');
 
-        $keyboard = $this->keyboardService->getTasksListInline('active');
+        $keyboard = ['inline_keyboard' => []];
         if ($formatted['keyboard']) {
-            $keyboard['inline_keyboard'] = array_merge($formatted['keyboard'], $keyboard['inline_keyboard']);
+            $keyboard['inline_keyboard'] = $formatted['keyboard'];
         }
+
+        // Добавляем фильтры
+        $filters = $this->keyboardService->getTasksFiltersInline('active');
+        $keyboard['inline_keyboard'] = array_merge(
+            $keyboard['inline_keyboard'],
+            $filters['inline_keyboard']
+        );
 
         try {
             $botService->editMessage($chatId, $messageId, $formatted['text'], $keyboard);
