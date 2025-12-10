@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\DTOs\TaskDTO;
 use App\Models\Task;
 use App\Services\Telegram\ConversationManager;
 use App\Services\Telegram\TelegramAuthService;
@@ -444,10 +445,11 @@ class ProcessTelegramMessage implements ShouldQueue
             case 'create_task':
                 if ($step === 'title') {
                     // Пользователь ввёл название задачи
-                    $task = $taskService->createTask([
+                    $dto = TaskDTO::fromArray([
                         'title' => $text,
                         'user_id' => $user->id,
                     ]);
+                    $task = $taskService->createTask($dto);
 
                     $conversationManager->clearState($chatId);
 
