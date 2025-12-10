@@ -247,26 +247,12 @@ class ProcessTelegramMessage implements ShouldQueue
             'overdue' => TelegramIcons::OVERDUE . ' Просроченные',
         ];
 
+        // Используем фильтр (для 'active' - невыполненные + выполненные сегодня, как на сайте)
         $tasks = $telegramTaskService->getTasksList($user, $filter);
-            $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи', 1, 5, $filter);
+        $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Все задачи', 1, 5, $filter);
 
-        // Собираем inline клавиатуру: сначала кнопки задач, потом фильтры
-        $inlineKeyboard = ['inline_keyboard' => []];
-
-        // Добавляем кнопки задач (если есть)
-        if ($formatted['keyboard']) {
-            $inlineKeyboard['inline_keyboard'] = $formatted['keyboard'];
-        }
-
-        // Добавляем фильтры внизу
-        $filters = $keyboardService->getTasksFiltersInline($filter);
-        $inlineKeyboard['inline_keyboard'] = array_merge(
-            $inlineKeyboard['inline_keyboard'],
-            $filters['inline_keyboard']
-        );
-
-        // Отправляем ОДНО сообщение со списком и кнопками
-        $botService->sendMessage($chatId, $formatted['text'], $inlineKeyboard);
+        // Отправляем сообщение только с кнопками задач (без фильтров)
+        $botService->sendMessage($chatId, $formatted['text'], $formatted['keyboard'] ? ['inline_keyboard' => $formatted['keyboard']] : null);
     }
 
     /**

@@ -280,21 +280,30 @@ class ProcessTelegramCallback implements ShouldQueue
 
             case 'tasks':
                 $tasks = $telegramTaskService->getTasksList($user, 'active');
-                $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи');
-                $keyboard = $this->keyboardService->getTasksListInline('active');
-                if ($formatted['keyboard']) {
-                    $keyboard['inline_keyboard'] = array_merge($formatted['keyboard'], $keyboard['inline_keyboard']);
-                }
+                $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи', 1, 5, 'active');
+                // Только кнопки задач (без фильтров)
+                $keyboard = $formatted['keyboard'] ? ['inline_keyboard' => $formatted['keyboard']] : null;
                 $botService->sendMessage($chatId, $formatted['text'], $keyboard);
                 break;
 
             case 'today':
-                $tasks = $telegramTaskService->getTasksList($user, 'today');
-                $formatted = $telegramTaskService->formatTasksList($tasks, TelegramIcons::TODAY . ' Задачи на сегодня');
-                $keyboard = $this->keyboardService->getTasksListInline('today');
-                if ($formatted['keyboard']) {
-                    $keyboard['inline_keyboard'] = array_merge($formatted['keyboard'], $keyboard['inline_keyboard']);
-                }
+                // Задачи на сегодня: невыполненные + выполненные сегодня (та же логика что на сайте)
+                $tasks = Task::where('user_id', $user->id)
+                    ->whereDate('due_date', today())
+                    ->where(function ($q) {
+                        $q->where('completed', false)
+                            ->orWhere(function ($subQ) {
+                                $subQ->where('completed', true)
+                                    ->whereDate('completed_at', '>=', now()->startOfDay());
+                            });
+                    })
+                    ->with(['priority', 'project', 'tags'])
+                    ->orderBy('completed')
+                    ->orderBy('order')
+                    ->orderByRaw('(SELECT `order` FROM priorities WHERE priorities.id = tasks.priority_id) DESC')
+                    ->get();
+                $formatted = $telegramTaskService->formatTasksList($tasks, TelegramIcons::TODAY . ' Задачи на сегодня', 1, 5, 'active');
+                $keyboard = $formatted['keyboard'] ? ['inline_keyboard' => $formatted['keyboard']] : null;
                 $botService->sendMessage($chatId, $formatted['text'], $keyboard);
                 break;
 
@@ -605,21 +614,12 @@ class ProcessTelegramCallback implements ShouldQueue
             'overdue' => TelegramIcons::OVERDUE . ' Просроченные',
         ];
 
-        $tasks = $telegramTaskService->getTasksList($user, $filter);
-        $formatted = $telegramTaskService->formatTasksList($tasks, $titles[$filter] ?? 'Задачи', $page, 5, $filter);
+        // Всегда показываем только активные задачи
+        $tasks = $telegramTaskService->getTasksList($user, 'active');
+        $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи', $page, 5, 'active');
 
-        // Собираем клавиатуру: задачи + фильтры
-        $keyboard = ['inline_keyboard' => []];
-        if ($formatted['keyboard']) {
-            $keyboard['inline_keyboard'] = $formatted['keyboard'];
-        }
-
-        // Добавляем фильтры внизу
-        $filters = $this->keyboardService->getTasksFiltersInline($filter);
-        $keyboard['inline_keyboard'] = array_merge(
-            $keyboard['inline_keyboard'],
-            $filters['inline_keyboard']
-        );
+        // Только кнопки задач (без фильтров)
+        $keyboard = $formatted['keyboard'] ? ['inline_keyboard' => $formatted['keyboard']] : null;
 
         try {
             $botService->editMessage($chatId, $messageId, $formatted['text'], $keyboard);
@@ -796,17 +796,8 @@ class ProcessTelegramCallback implements ShouldQueue
         $tasks = $telegramTaskService->getTasksList($user, 'active');
         $formatted = $telegramTaskService->formatTasksList($tasks, 'Все задачи', $page, 5, 'active');
 
-        $keyboard = ['inline_keyboard' => []];
-        if ($formatted['keyboard']) {
-            $keyboard['inline_keyboard'] = $formatted['keyboard'];
-        }
-
-        // Добавляем фильтры
-        $filters = $this->keyboardService->getTasksFiltersInline('active');
-        $keyboard['inline_keyboard'] = array_merge(
-            $keyboard['inline_keyboard'],
-            $filters['inline_keyboard']
-        );
+        // Только кнопки задач (без фильтров)
+        $keyboard = $formatted['keyboard'] ? ['inline_keyboard' => $formatted['keyboard']] : null;
 
         try {
             $botService->editMessage($chatId, $messageId, $formatted['text'], $keyboard);
