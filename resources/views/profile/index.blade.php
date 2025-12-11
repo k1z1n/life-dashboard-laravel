@@ -246,6 +246,41 @@
         </div>
     </main>
 
+    <!-- Telegram Link Modal (для iOS/Safari PWA) -->
+    <div id="telegramLinkModal" class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-md z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeTelegramLinkModal()">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-slate-900">Подключение Telegram</h3>
+                <button onclick="closeTelegramLinkModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <p class="text-slate-600 mb-4">
+                Нажмите на ссылку ниже, чтобы открыть Telegram и подключить аккаунт:
+            </p>
+
+            <div class="mb-4">
+                <a id="telegramLink" href="#" target="_blank" rel="noopener noreferrer"
+                   class="block w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-center transition-colors break-all">
+                    <span id="telegramLinkText">Открыть Telegram</span>
+                </a>
+            </div>
+
+            <div class="flex items-center gap-2 p-3 bg-slate-50 rounded-lg mb-4">
+                <button onclick="copyTelegramLink()" class="flex-1 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors text-sm">
+                    📋 Копировать ссылку
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500 text-center">
+                После подключения вернитесь в приложение и обновите страницу
+            </p>
+        </div>
+    </div>
+
     <script>
         function toggleDateGroup(date) {
             const tasksElement = document.getElementById(`tasks-${date}`);
@@ -257,6 +292,115 @@
             } else {
                 tasksElement.classList.add('hidden');
                 chevronElement.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        /**
+         * Универсальный метод открытия Telegram ссылки
+         * Работает в PWA режиме на iOS/Safari и других браузерах
+         */
+        function openTelegramLink(url) {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+            const isPWA = isStandalone;
+
+            // Для iOS/Safari/PWA всегда показываем модальное окно с ссылкой
+            // Это самый надёжный способ для PWA режима
+            if (isIOS || (isSafari && isPWA)) {
+                showTelegramLinkModal(url);
+                return false; // Возвращаем false чтобы показать модальное окно
+            } else {
+                // Для других браузеров пробуем автоматическое открытие
+                try {
+                    const telegramWindow = window.open(url, '_blank', 'noopener,noreferrer');
+
+                    // Проверяем успешность открытия
+                    if (!telegramWindow || telegramWindow.closed || typeof telegramWindow.closed === 'undefined') {
+                        // Если window.open заблокирован, показываем модальное окно
+                        showTelegramLinkModal(url);
+                        return false;
+                    }
+
+                    return true;
+                } catch (e) {
+                    console.warn('window.open failed, showing modal:', e);
+                    // Fallback на модальное окно
+                    showTelegramLinkModal(url);
+                    return false;
+                }
+            }
+        }
+
+        /**
+         * Показать модальное окно с ссылкой Telegram
+         */
+        function showTelegramLinkModal(url) {
+            const modal = document.getElementById('telegramLinkModal');
+            const link = document.getElementById('telegramLink');
+            const linkText = document.getElementById('telegramLinkText');
+
+            if (modal && link) {
+                link.href = url;
+                linkText.textContent = url.length > 40 ? url.substring(0, 37) + '...' : url;
+                modal.classList.remove('hidden');
+
+                // Сохраняем URL для копирования
+                modal.dataset.url = url;
+            }
+        }
+
+        /**
+         * Закрыть модальное окно
+         */
+        function closeTelegramLinkModal() {
+            const modal = document.getElementById('telegramLinkModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Копировать ссылку Telegram в буфер обмена
+         */
+        function copyTelegramLink(event) {
+            const modal = document.getElementById('telegramLinkModal');
+            const url = modal?.dataset.url;
+
+            if (url && navigator.clipboard) {
+                navigator.clipboard.writeText(url).then(() => {
+                    const button = event?.target || document.querySelector('#telegramLinkModal button');
+                    if (button) {
+                        const originalText = button.textContent;
+                        button.textContent = '✓ Скопировано!';
+                        button.classList.add('bg-green-50', 'text-green-700', 'border-green-300');
+
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.classList.remove('bg-green-50', 'text-green-700', 'border-green-300');
+                        }, 2000);
+                    } else {
+                        alert('✓ Ссылка скопирована в буфер обмена!');
+                    }
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                    alert('Не удалось скопировать ссылку. Попробуйте скопировать вручную.');
+                });
+            } else {
+                // Fallback для старых браузеров
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('Ссылка скопирована в буфер обмена!');
+                } catch (err) {
+                    alert('Не удалось скопировать ссылку. Скопируйте вручную из ссылки выше.');
+                }
+                document.body.removeChild(textArea);
             }
         }
 
@@ -277,11 +421,20 @@
                 console.log('Data:', data);
 
                 if (data.success) {
-                    // Open Telegram deep link
-                    window.open(data.link, '_blank');
+                    // Используем универсальный метод открытия ссылки
+                    const opened = openTelegramLink(data.link);
 
-                    // Show message
-                    alert('Перейдите в Telegram и нажмите "Start" для завершения подключения.\n\nПосле подключения обновите страницу.');
+                    // Если автоматическое открытие не удалось, модальное окно уже показано
+                    // Если удалось, показываем сообщение с инструкциями
+                    if (opened) {
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+                        const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+                        if (!isIOS && !isStandalone) {
+                            alert('Откроется Telegram в новой вкладке.\n\nПосле подключения вернитесь и обновите страницу.');
+                        }
+                    }
+                    // Если opened === false, модальное окно уже показано, ничего дополнительно не делаем
                 } else {
                     alert('Ошибка: ' + (data.message || 'Не удалось создать ссылку'));
                 }
@@ -290,6 +443,13 @@
                 alert('Произошла ошибка при подключении Telegram');
             }
         }
+
+        // Закрытие модального окна по Escape
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeTelegramLinkModal();
+            }
+        });
 
         async function disconnectTelegram() {
             if (!confirm('Вы уверены, что хотите отключить Telegram?')) {
