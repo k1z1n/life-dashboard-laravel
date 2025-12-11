@@ -738,19 +738,70 @@
             // Убеждаемся, что метод POST
             taskMethod.value = 'POST';
 
+            // Определяем projectId для установки в форму
+            let targetProjectId = projectId;
+
+            // Если projectId не передан явно, определяем из текущей активной вкладки
+            if (!targetProjectId) {
+                // Пытаемся получить из localStorage
+                try {
+                    const savedTabId = localStorage.getItem('selectedProjectTab');
+                    if (savedTabId && savedTabId !== 'all' && savedTabId !== 'undefined' && savedTabId !== 'null') {
+                        // Проверяем что это число (ID проекта), а не "all"
+                        const tabIdAsNumber = parseInt(savedTabId);
+                        if (!isNaN(tabIdAsNumber)) {
+                            targetProjectId = tabIdAsNumber;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Не удалось получить вкладку из localStorage:', e);
+                }
+
+                // Если не получилось из localStorage, пытаемся из data-атрибута
+                if (!targetProjectId) {
+                    const dataSelectedTab = document.documentElement.getAttribute('data-selected-tab');
+                    if (dataSelectedTab && dataSelectedTab !== 'all') {
+                        const tabIdAsNumber = parseInt(dataSelectedTab);
+                        if (!isNaN(tabIdAsNumber)) {
+                            targetProjectId = tabIdAsNumber;
+                        }
+                    }
+                }
+
+                // Если всё ещё не получилось, пытаемся из активной кнопки вкладки
+                if (!targetProjectId) {
+                    const activeTab = document.querySelector('.tab-button.bg-blue-600');
+                    if (activeTab) {
+                        const tabId = activeTab.id.replace('tab-', '').replace('-mobile', '');
+                        if (tabId && tabId !== 'all') {
+                            const tabIdAsNumber = parseInt(tabId);
+                            if (!isNaN(tabIdAsNumber)) {
+                                targetProjectId = tabIdAsNumber;
+                            }
+                        }
+                    }
+                }
+            }
+
             // Устанавливаем projectId после reset, чтобы он не сбросился
-            if (projectId) {
+            if (targetProjectId) {
                 const projectSelect = document.getElementById('taskProjectId');
                 if (projectSelect) {
                     // Преобразуем projectId в строку для сравнения
-                    const projectIdStr = String(projectId);
+                    const projectIdStr = String(targetProjectId);
                     // Проверяем, существует ли опция с таким значением
                     const optionExists = Array.from(projectSelect.options).some(option => String(option.value) === projectIdStr);
                     if (optionExists) {
                         projectSelect.value = projectIdStr;
                     } else {
-                        console.warn('Project with ID', projectId, 'not found in select options');
+                        console.warn('Project with ID', targetProjectId, 'not found in select options');
                     }
+                }
+            } else {
+                // Если вкладка "all" или projectId не определён, очищаем выбор проекта
+                const projectSelect = document.getElementById('taskProjectId');
+                if (projectSelect) {
+                    projectSelect.value = '';
                 }
             }
 
@@ -1890,7 +1941,8 @@
                 console.log('updateTasksOrder: Response data', data);
                 if (data.success) {
                     console.log('✅ Порядок задач обновлен успешно в базе данных');
-                    // Порядок уже визуально изменен в DOM, не нужно перезагружать страницу
+                    // Обновляем дашборд чтобы синхронизировать с сервером
+                    refreshDashboard();
                 } else {
                     console.error('❌ Ошибка при обновлении порядка:', data);
                 }
@@ -2819,13 +2871,19 @@
 
         // Функция для обновления дашборда без перезагрузки
         function refreshDashboard(switchToProjectId = null) {
-            // Добавляем timestamp для предотвращения кэширования на PWA
+            // Добавляем timestamp для предотвращения кэширования
             const timestamp = new Date().getTime();
-            fetch('{{ route("dashboard") }}?t=' + timestamp, {
+            const random = Math.random().toString(36).substring(7);
+
+            fetch('{{ route("dashboard") }}?t=' + timestamp + '&r=' + random, {
+                method: 'GET',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'Cache-Control': 'no-cache'
-                }
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                cache: 'no-store'
             })
             .then(response => response.json())
             .then(data => {
@@ -2995,13 +3053,46 @@
 
                     // Обновляем обработчики событий для новых элементов
                     reinitializeEventHandlers();
+
+                    // Обновляем время последнего обновления
+                    if (typeof lastUpdateTime !== 'undefined') {
+                        lastUpdateTime = Date.now();
+                    }
                 } else {
                     location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error refreshing dashboard:', error);
-                location.reload();
+                // Пытаемся повторить запрос один раз перед перезагрузкой
+                console.log('Retrying dashboard refresh...');
+                setTimeout(() => {
+                    const retryTimestamp = new Date().getTime();
+                    const retryRandom = Math.random().toString(36).substring(7);
+                    fetch('{{ route("dashboard") }}?t=' + retryTimestamp + '&r=' + retryRandom, {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        },
+                        cache: 'no-store'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.html) {
+                            location.reload(); // Если получили данные, перезагружаем страницу
+                        } else {
+                            console.error('Failed to refresh dashboard after retry');
+                            location.reload();
+                        }
+                    })
+                    .catch(retryError => {
+                        console.error('Retry also failed:', retryError);
+                        location.reload();
+                    });
+                }, 500);
             });
         }
 
@@ -3096,6 +3187,20 @@
                 alert('Ошибка при удалении проекта');
             });
         }
+
+        // Автоматическое обновление при возврате на вкладку
+        let lastUpdateTime = Date.now();
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                // Пользователь вернулся на вкладку
+                const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+                // Обновляем если прошло больше 5 секунд с последнего обновления
+                if (timeSinceLastUpdate > 5000) {
+                    console.log('Tab became visible, refreshing dashboard...');
+                    refreshDashboard();
+                }
+            }
+        });
     </script>
 </body>
 </html>
