@@ -42,13 +42,20 @@ class DashboardController extends Controller
         // Задачи без проекта (null project_id)
         $tasksWithoutProject = $this->taskService->getTasksByProjectId(null, $userId);
 
+        $viewData = compact('projects', 'priorities', 'tags', 'allTasks', 'tasksByProject', 'tasksWithoutProject');
+
         // Если это AJAX запрос, возвращаем только HTML контент
         if (request()->wantsJson() || request()->ajax()) {
             return response()->json([
-                'html' => view('dashboard', compact('projects', 'priorities', 'tags', 'allTasks', 'tasksByProject', 'tasksWithoutProject'))->render()
-            ]);
+                'html' => view('dashboard', $viewData)->render()
+            ])->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+              ->header('Pragma', 'no-cache')
+              ->header('Expires', '0');
         }
 
-        return view('dashboard', compact('projects', 'priorities', 'tags', 'allTasks', 'tasksByProject', 'tasksWithoutProject'));
+        return response()->view('dashboard', $viewData)
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0');
     }
 }
