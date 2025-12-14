@@ -15,11 +15,12 @@ class StoreTaskRequest extends FormRequest
     public function rules(): array
     {
         $userId = auth()->id();
-        
+
         return [
             'project_id' => ['nullable', 'integer', Rule::exists('projects', 'id')->where('user_id', $userId)],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'reminder_text' => ['nullable', 'string', 'max:2000'],
             'priority_id' => ['nullable', 'integer', Rule::exists('priorities', 'id')->where('user_id', $userId)],
             'due_date' => ['nullable', 'date'],
             'due_time' => ['nullable', 'date_format:H:i'],

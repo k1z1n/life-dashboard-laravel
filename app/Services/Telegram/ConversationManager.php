@@ -92,3 +92,5 @@ class ConversationManager
         return $this->prefix . $chatId;
     }
 }
+
+

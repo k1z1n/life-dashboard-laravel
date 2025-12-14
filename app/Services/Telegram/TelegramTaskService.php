@@ -77,6 +77,10 @@ class TelegramTaskService
             $message .= TelegramIcons::TASK . " <b>Описание:</b>\n{$task->description}\n\n";
         }
 
+        if ($detailed && $task->reminder_text) {
+            $message .= TelegramIcons::CLOCK . " <b>Напоминания:</b>\n{$task->reminder_text}\n\n";
+        }
+
         if ($task->project) {
             $message .= TelegramIcons::PROJECT . " Проект: <b>{$task->project->name}</b>\n";
         }

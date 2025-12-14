@@ -4,11 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Life Dashboard">
+    <meta name="application-name" content="Life Dashboard">
+    <meta name="msapplication-TileColor" content="#3b82f6">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Life Dashboard - Управление задачами</title>
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
         // Восстанавливаем выбранный проект ДО загрузки DOM, чтобы избежать визуального переключения
@@ -120,6 +126,30 @@
 {{--                    <p class="text-sm text-slate-600 mt-1">Управление задачами</p>--}}
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
+                    <!-- Web notifications bell -->
+                    <div id="webNotificationBell" class="relative">
+                        <button type="button" id="webNotificationBellBtn"
+                                class="relative inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/80 hover:bg-white text-slate-600 hover:text-slate-800 shadow-sm border border-slate-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0h6z"/>
+                            </svg>
+                            <span id="webNotificationBellBadge"
+                                  class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[11px] leading-[18px] text-center"></span>
+                        </button>
+
+                        <div id="webNotificationDropdown"
+                             class="hidden absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50">
+                            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                                <div class="text-sm font-semibold text-slate-900">Уведомления</div>
+                                <div class="text-xs text-slate-500" id="webNotificationSubtitle">Загрузка…</div>
+                            </div>
+                            <div id="webNotificationList" class="max-h-96 overflow-y-auto">
+                                <div class="px-4 py-6 text-sm text-slate-500 text-center">Загрузка…</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <a href="{{ route('profile') }}" class="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm sm:text-base">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -467,6 +497,14 @@
                 </div>
 
                 <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Напоминания</label>
+                    <textarea name="reminder_text" id="taskReminderText" rows="2"
+                              placeholder="Например: напоминай каждый час до 18:00"
+                              class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"></textarea>
+                    <p class="mt-1 text-xs text-slate-500">Свободный текст → точные времена через AI, уведомления приходят в Telegram.</p>
+                </div>
+
+                <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-2">Приоритет</label>
                     <select name="priority_id" id="taskPriority"
                             class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
@@ -524,6 +562,30 @@
     </div>
 
     <script>
+        // Более понятные ошибки вместо "Unexpected EOF" при response.json() (Safari/WebKit)
+        (function () {
+            try {
+                const originalJson = Response.prototype.json;
+                Response.prototype.json = async function () {
+                    const cloned = this.clone();
+                    const text = await cloned.text();
+
+                    if (!text) {
+                        throw new Error(`Пустой JSON-ответ (HTTP ${this.status}) от ${this.url}`);
+                    }
+
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        throw new Error(`Некорректный JSON (HTTP ${this.status}) от ${this.url}: ${text.slice(0, 300)}`);
+                    }
+                };
+            } catch (e) {
+                // если не удалось пропатчить — не ломаем страницу
+                console.warn('Could not patch Response.json:', e);
+            }
+        })();
+
         // Project Modal
         // Блокировка скролла body при открытии модального окна
         function lockBodyScroll() {
@@ -811,7 +873,7 @@
             });
         };
 
-        window.openEditTaskModal = function(id, title, description, priorityId, dueDate, projectId, dueTime = '', tagIds = []) {
+        window.openEditTaskModal = function(id, title, description, priorityId, dueDate, projectId, dueTime = '', tagIds = [], reminderText = '') {
             try {
                 const taskModal = document.getElementById('taskModal');
                 if (!taskModal) {
@@ -840,6 +902,7 @@
                 const taskIdEl = document.getElementById('taskId');
                 const taskTitleEl = document.getElementById('taskTitle');
                 const taskDescriptionEl = document.getElementById('taskDescription');
+                const taskReminderTextEl = document.getElementById('taskReminderText');
                 const taskPriorityEl = document.getElementById('taskPriority');
                 const taskDueDateEl = document.getElementById('taskDueDate');
                 const taskDueTimeEl = document.getElementById('taskDueTime');
@@ -848,6 +911,7 @@
                 if (taskIdEl) taskIdEl.value = id;
                 if (taskTitleEl) taskTitleEl.value = title || '';
                 if (taskDescriptionEl) taskDescriptionEl.value = description || '';
+                if (taskReminderTextEl) taskReminderTextEl.value = reminderText || '';
                 if (taskPriorityEl) taskPriorityEl.value = priorityId || '';
                 if (taskDueDateEl) taskDueDateEl.value = dueDate || '';
                 if (taskDueTimeEl) taskDueTimeEl.value = dueTime || '';
@@ -872,8 +936,8 @@
         // Task Details Modal
         let currentTaskDetails = null;
 
-        window.openTaskDetailsModal = function(id, title, description, priorityId, dueDate, projectId, dueTime, completed, priorityName, priorityColor, projectName, projectColor) {
-            currentTaskDetails = { id, title, description, priorityId, dueDate, projectId, dueTime, completed };
+        window.openTaskDetailsModal = function(id, title, description, priorityId, dueDate, projectId, dueTime, completed, priorityName, priorityColor, projectName, projectColor, reminderText = '') {
+            currentTaskDetails = { id, title, description, priorityId, dueDate, projectId, dueTime, completed, reminderText };
 
             document.getElementById('taskDetailsModal').classList.remove('hidden');
             lockBodyScroll();
@@ -999,7 +1063,8 @@
                     taskData.dueDate || '',
                     taskData.projectId || null,
                     taskData.dueTime || '',
-                    tagIds
+                    tagIds,
+                    taskData.reminderText || ''
                 );
             }, 100);
         };
@@ -2765,6 +2830,7 @@
                         project_id: formData.get('project_id') || null,
                         title: formData.get('title'),
                         description: formData.get('description') || null,
+                        reminder_text: formData.get('reminder_text') || null,
                         priority_id: formData.get('priority_id') || null,
                         due_date: formData.get('due_date') || null,
                         due_time: formData.get('due_time') || null,
@@ -2775,16 +2841,29 @@
                         data.completed = formData.get('completed') === 'on';
                     }
 
+                    async function parseJsonOrThrow(response) {
+                        const text = await response.text();
+                        if (!text) {
+                            throw new Error(`Пустой ответ от сервера (HTTP ${response.status})`);
+                        }
+                        try {
+                            return JSON.parse(text);
+                        } catch (err) {
+                            throw new Error(`Не удалось разобрать JSON (HTTP ${response.status}). Ответ: ${text.slice(0, 300)}`);
+                        }
+                    }
+
                     fetch(url, {
                         method: method,
                         headers: {
                             'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
                             'Content-Type': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest'
                         },
                         body: JSON.stringify(data)
                     })
-                    .then(response => response.json())
+                    .then(parseJsonOrThrow)
                     .then(data => {
                         if (data.success) {
                             window.closeTaskModal();
@@ -2795,7 +2874,7 @@
                     })
                     .catch(error => {
                         console.error('Error saving task:', error);
-                        alert('Ошибка при сохранении задачи');
+                        alert(error?.message || 'Ошибка при сохранении задачи');
                     });
                 });
             }
@@ -3201,6 +3280,141 @@
                 }
             }
         });
+    </script>
+
+    <script>
+        // Web notifications bell (no Alpine)
+        (function () {
+            const bell = document.getElementById('webNotificationBell');
+            const btn = document.getElementById('webNotificationBellBtn');
+            const badge = document.getElementById('webNotificationBellBadge');
+            const dropdown = document.getElementById('webNotificationDropdown');
+            const list = document.getElementById('webNotificationList');
+            const subtitle = document.getElementById('webNotificationSubtitle');
+
+            if (!bell || !btn || !badge || !dropdown || !list || !subtitle) return;
+
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+            let open = false;
+            let loading = false;
+
+            function setUnread(count) {
+                if (count > 0) {
+                    badge.textContent = count > 99 ? '99+' : String(count);
+                    badge.classList.remove('hidden');
+                    subtitle.textContent = `Новых: ${count}`;
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('hidden');
+                    subtitle.textContent = 'Нет новых';
+                }
+            }
+
+            async function fetchNotifications() {
+                if (loading) return;
+                loading = true;
+                subtitle.textContent = 'Загрузка…';
+                try {
+                    const res = await fetch('{{ route('notifications.index') }}?limit=15', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    });
+                    const data = await res.json();
+                    const items = data.items || [];
+                    const unread = data.unread_count || 0;
+                    setUnread(unread);
+
+                    if (items.length === 0) {
+                        list.innerHTML = '<div class="px-4 py-6 text-sm text-slate-500 text-center">Пока нет уведомлений</div>';
+                        return;
+                    }
+
+                    list.innerHTML = '';
+                    items.forEach(n => {
+                        const a = document.createElement('a');
+                        a.href = n.url || '#';
+                        a.className = 'block px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition';
+                        if (n.read_at) a.classList.add('opacity-70');
+
+                        a.innerHTML = `
+                            <div class="flex items-start gap-2">
+                                <div class="mt-1 w-2 h-2 rounded-full ${n.read_at ? 'bg-slate-300' : 'bg-indigo-600'}"></div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium text-slate-900 truncate">${(n.title || 'Уведомление')}</div>
+                                    <div class="text-sm text-slate-600 whitespace-pre-wrap break-words">${(n.body || '')}</div>
+                                    <div class="mt-1 text-xs text-slate-400">${(n.created_human || '')}</div>
+                                </div>
+                            </div>
+                        `;
+
+                        async function markRead() {
+                            if (n.read_at) return;
+                            try {
+                                const r = await fetch(`/notifications/${n.id}/read`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                        'Content-Type': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'X-CSRF-TOKEN': csrf,
+                                    },
+                                    body: JSON.stringify({}),
+                                });
+                                const d = await r.json();
+                                n.read_at = new Date().toISOString();
+                                a.classList.add('opacity-70');
+                                setUnread(d.unread_count ?? Math.max(0, unread - 1));
+                            } catch (e) {
+                                console.error('Failed to mark notification read', e);
+                            }
+                        }
+
+                        // desktop: hover
+                        a.addEventListener('mouseenter', () => { markRead(); });
+                        // mobile: tap
+                        a.addEventListener('click', async (e) => {
+                            if (!n.url) e.preventDefault();
+                            await markRead();
+                        });
+
+                        list.appendChild(a);
+                    });
+                } catch (e) {
+                    console.error('Failed to load notifications', e);
+                    subtitle.textContent = 'Ошибка';
+                    list.innerHTML = '<div class="px-4 py-6 text-sm text-red-600 text-center">Ошибка загрузки уведомлений</div>';
+                } finally {
+                    loading = false;
+                }
+            }
+
+            function openDropdown() {
+                open = true;
+                dropdown.classList.remove('hidden');
+                fetchNotifications();
+            }
+
+            function closeDropdown() {
+                open = false;
+                dropdown.classList.add('hidden');
+            }
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (open) closeDropdown();
+                else openDropdown();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!open) return;
+                if (!bell.contains(e.target)) closeDropdown();
+            });
+
+            // initial fetch to show badge even if dropdown closed
+            fetchNotifications();
+        })();
     </script>
 </body>
 </html>

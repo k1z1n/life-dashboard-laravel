@@ -1,17 +1,17 @@
 <div class="task-item-wrapper relative transition-all duration-300 ease-out py-1.5 sm:py-2 w-full" style="will-change: transform;">
-    <div class="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 lg:p-5 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md bg-white transition-all duration-200 {{ $task->completed ? 'opacity-60 bg-slate-50' : '' }} task-item cursor-pointer w-full max-w-full overflow-hidden" 
-         draggable="true" 
+    <div class="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 lg:p-5 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md bg-white transition-all duration-200 {{ $task->completed ? 'opacity-60 bg-slate-50' : '' }} task-item cursor-pointer w-full max-w-full overflow-hidden"
+         draggable="true"
          data-task-id="{{ $task->id }}"
-         onclick="if (!event.target.closest('.task-toggle-form') && !event.target.closest('button[type=\'submit\']')) { window.openTaskDetailsModal({{ $task->id }}, '{{ addslashes($task->title) }}', '{{ addslashes($task->description ?? '') }}', {{ $task->priority_id ?? 'null' }}, '{{ $task->due_date ? $task->due_date->format('Y-m-d') : '' }}', {{ $task->project_id ?? 'null' }}, '{{ $task->due_time ?? '' }}', {{ $task->completed ? 'true' : 'false' }}, '{{ $task->priority ? addslashes($task->priority->name) : '' }}', '{{ $task->priority ? $task->priority->color : '' }}', @if($task->project_id) @php $projectData = \App\Models\Project::find($task->project_id); @endphp @if($projectData) '{{ addslashes($projectData->name) }}', '{{ $projectData->color }}' @else '', '' @endif @else '', '' @endif); }">
+         onclick='if (!event.target.closest(".task-toggle-form") && !event.target.closest("button[type=submit]")) { window.openTaskDetailsModal({{ $task->id }}, @json($task->title), @json($task->description ?? ""), {{ $task->priority_id ?? 'null' }}, @json($task->due_date ? $task->due_date->format("Y-m-d") : ""), {{ $task->project_id ?? 'null' }}, @json($task->due_time ?? ""), {{ $task->completed ? 'true' : 'false' }}, @json($task->priority ? $task->priority->name : ""), @json($task->priority ? $task->priority->color : ""), @json($task->project ? $task->project->name : ""), @json($task->project ? $task->project->color : ""), @json($task->reminder_text ?? "")); }'>
         <!-- Checkbox -->
-        <form action="{{ route('tasks.toggle', $task) }}" method="POST" class="mt-0.5 flex-shrink-0 task-toggle-form" 
-              onmousedown="event.stopPropagation()" 
-              onclick="event.stopPropagation()" 
+        <form action="{{ route('tasks.toggle', $task) }}" method="POST" class="mt-0.5 flex-shrink-0 task-toggle-form"
+              onmousedown="event.stopPropagation()"
+              onclick="event.stopPropagation()"
               ontouchstart="event.stopPropagation()"
               onsubmit="event.preventDefault(); toggleTaskComplete({{ $task->id }}, this); return false;">
             @csrf
             @method('PATCH')
-            <button type="submit" 
+            <button type="submit"
                     class="w-6 h-6 rounded-md border-2 {{ $task->completed ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-green-400' }} flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                     onclick="event.stopPropagation()"
                     onmousedown="event.stopPropagation()"
@@ -23,7 +23,7 @@
                 @endif
             </button>
         </form>
-        
+
         <div class="flex-1 min-w-0 overflow-hidden">
             <h3 class="font-semibold text-slate-900 {{ $task->completed ? 'line-through text-slate-500' : '' }} text-base leading-tight break-words">
                 {{ $task->title }}
@@ -38,7 +38,7 @@
                         {{ $task->priority->name }}
                     </span>
                 @endif
-                
+
                 <!-- Project Badge -->
                 @if($task->project_id)
                     @php
@@ -54,7 +54,7 @@
                         </span>
                     @endif
                 @endif
-                
+
                 <!-- Tags -->
                 @if($task->tags && $task->tags->count() > 0)
                     @foreach($task->tags as $tag)
@@ -63,7 +63,7 @@
                         </span>
                     @endforeach
                 @endif
-                
+
                 <!-- Due Date -->
                 @if($task->due_date && !$task->completed)
                     <span class="inline-flex items-center gap-1.5 {{ $task->isOverdue() ? 'text-red-600 font-semibold' : 'text-slate-600' }} text-xs">
@@ -75,18 +75,18 @@
                             в {{ $task->due_time }}
                         @endif
                     </span>
-                    
+
                     @php
                         $hoursLeft = $task->getHoursUntilDue();
                         $minutesLeft = $task->getMinutesUntilDue();
                         $daysLeft = $task->getDaysUntilDue();
                         $isToday = $task->isDueToday();
-                        
+
                         // Определяем, что показывать
                         $showDays = $daysLeft !== null && $daysLeft >= 1;
                         $showHours = $hoursLeft !== null && $hoursLeft >= 1 && $daysLeft < 1;
                         $showMinutes = $minutesLeft !== null && $minutesLeft < 60 && $hoursLeft < 1;
-                        
+
                         // Определяем цвет в зависимости от оставшегося времени
                         $colorClass = 'bg-green-100 text-green-700 border border-green-200';
                         if ($daysLeft !== null && $daysLeft < 1) {
@@ -96,7 +96,7 @@
                         }
                     @endphp
                     @if($hoursLeft !== null || $daysLeft !== null)
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold {{ $colorClass }}" 
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold {{ $colorClass }}"
                               data-due-date="{{ $task->due_date->format('Y-m-d') }}"
                               data-due-time="{{ $task->due_time ?? '' }}"
                               data-is-today="{{ $isToday ? '1' : '0' }}"
@@ -106,7 +106,7 @@
                             </svg>
                             @if($showDays)
                                 <span class="time-left" data-days="{{ $daysLeft }}">
-                                    <span class="days-left">{{ $daysLeft }}</span> 
+                                    <span class="days-left">{{ $daysLeft }}</span>
                                     @if($daysLeft == 1)
                                         день
                                     @elseif($daysLeft >= 2 && $daysLeft <= 4)
@@ -117,7 +117,7 @@
                                 </span>
                             @elseif($showHours)
                                 <span class="time-left" data-hours="{{ $hoursLeft }}">
-                                    <span class="hours-left">{{ $hoursLeft }}</span> 
+                                    <span class="hours-left">{{ $hoursLeft }}</span>
                                     @if($hoursLeft == 1)
                                         час
                                     @elseif($hoursLeft >= 2 && $hoursLeft <= 4)
@@ -128,7 +128,7 @@
                                 </span>
                             @elseif($showMinutes)
                                 <span class="time-left" data-minutes="{{ $minutesLeft }}">
-                                    <span class="minutes-left">{{ $minutesLeft }}</span> 
+                                    <span class="minutes-left">{{ $minutesLeft }}</span>
                                     @if($minutesLeft == 1)
                                         минута
                                     @elseif($minutesLeft >= 2 && $minutesLeft <= 4)
@@ -150,20 +150,20 @@
                 @endif
             </div>
         </div>
-        
+
         <!-- Action Buttons -->
         <div class="flex gap-1 sm:gap-1.5 flex-shrink-0 ml-1 sm:ml-2" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
-            <button onclick="event.stopPropagation(); window.openEditTaskModal({{ $task->id }}, '{{ addslashes($task->title) }}', '{{ addslashes($task->description ?? '') }}', {{ $task->priority_id ?? 'null' }}, '{{ $task->due_date ? $task->due_date->format('Y-m-d') : '' }}', {{ $task->project_id ?? 'null' }}, '{{ $task->due_time ?? '' }}', [{{ $task->tags->pluck('id')->implode(',') }}])" 
-                    class="p-1.5 sm:p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0" 
+            <button onclick='event.stopPropagation(); window.openEditTaskModal({{ $task->id }}, @json($task->title), @json($task->description ?? ""), {{ $task->priority_id ?? 'null' }}, @json($task->due_date ? $task->due_date->format("Y-m-d") : ""), {{ $task->project_id ?? 'null' }}, @json($task->due_time ?? ""), [{{ $task->tags->pluck('id')->implode(',') }}], @json($task->reminder_text ?? ""))'
+                    class="p-1.5 sm:p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex-shrink-0"
                     title="Редактировать">
                 <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                 </svg>
             </button>
             <button type="button" onclick="event.stopPropagation(); if(confirm('Удалить эту задачу?')) deleteTask({{ $task->id }}, this)"
-                    class="p-1.5 sm:p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 flex-shrink-0" 
+                    class="p-1.5 sm:p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 flex-shrink-0"
                     title="Удалить"
-                    onmousedown="event.stopPropagation()" 
+                    onmousedown="event.stopPropagation()"
                     ontouchstart="event.stopPropagation()">
                 <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>

@@ -74,3 +74,5 @@ class PrioritiesCommand implements TelegramCommandInterface
         return 'Список приоритетов';
     }
 }
+
+

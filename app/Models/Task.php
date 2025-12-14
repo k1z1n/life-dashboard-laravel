@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Task extends Model
 {
@@ -13,6 +15,7 @@ class Task extends Model
         'project_id',
         'title',
         'description',
+        'reminder_text',
         'completed',
         'completed_at',
         'priority_id',
@@ -49,6 +52,11 @@ class Task extends Model
         return $this->belongsTo(Project::class);
     }
 
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(TaskReminder::class);
+    }
+
     // Accessor для due_time (формат H:i)
     public function getDueTimeAttribute($value)
     {
@@ -61,6 +69,19 @@ class Task extends Model
         }
         // Если это время из базы, форматируем
         return $value ? date('H:i', strtotime($value)) : null;
+    }
+
+    public function getReminderExpiresAt(): ?Carbon
+    {
+        if (!$this->due_date) {
+            return null;
+        }
+
+        if ($this->due_time) {
+            return $this->due_date->copy()->setTimeFromTimeString($this->due_time);
+        }
+
+        return $this->due_date->copy()->endOfDay();
     }
 
 

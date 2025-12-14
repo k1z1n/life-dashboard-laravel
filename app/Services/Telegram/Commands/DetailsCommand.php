@@ -78,3 +78,5 @@ class DetailsCommand implements TelegramCommandInterface
         return 'Показать детали задачи';
     }
 }
+
+

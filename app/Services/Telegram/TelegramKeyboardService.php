@@ -8,7 +8,7 @@ use App\Models\Priority;
 
 /**
  * Сервис для создания контекстных клавиатур Telegram
- * 
+ *
  * Reply Keyboard — постоянные кнопки внизу экрана (меняются по контексту)
  * Inline Keyboard — кнопки под сообщениями
  */
@@ -98,7 +98,7 @@ class TelegramKeyboardService
      */
     public function getTaskDetailsKeyboard(bool $isCompleted = false): array
     {
-        $completeBtn = $isCompleted 
+        $completeBtn = $isCompleted
             ? ['text' => TelegramIcons::BACK . ' Вернуть']
             : ['text' => TelegramIcons::TASK_DONE . ' Выполнить'];
 
@@ -310,6 +310,11 @@ class TelegramKeyboardService
         $buttons[] = [
             ['text' => TelegramIcons::TASK_EDIT . ' Изменить', 'callback_data' => "task_edit_{$task->id}"],
             ['text' => TelegramIcons::CALENDAR . ' Срок', 'callback_data' => "task_setdate_{$task->id}"],
+        ];
+
+        // Напоминания
+        $buttons[] = [
+            ['text' => TelegramIcons::CLOCK . ' Напоминания', 'callback_data' => "task_setreminder_{$task->id}"],
         ];
 
         // Проект и приоритет
