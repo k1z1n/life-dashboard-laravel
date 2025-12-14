@@ -21,3 +21,5 @@ interface TelegramCommandInterface
      */
     public function getDescription(): string;
 }
+
+

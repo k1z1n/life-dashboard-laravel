@@ -12,6 +12,7 @@ use App\Services\Telegram\TelegramTaskService;
 use App\Services\Telegram\TelegramIcons;
 use App\Services\Telegram\Commands\HelpCommand;
 use App\Services\TaskService;
+use App\Services\Reminders\TaskReminderScheduler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -40,6 +41,7 @@ class ProcessTelegramMessage implements ShouldQueue
         TelegramAuthService $authService,
         TelegramTaskService $telegramTaskService,
         TaskService $taskService,
+        TaskReminderScheduler $reminderScheduler,
         ConversationManager $conversationManager
     ): void {
         try {
@@ -66,7 +68,7 @@ class ProcessTelegramMessage implements ShouldQueue
 
             // Проверяем, есть ли активный диалог (conversation)
             if ($conversationManager->hasState($chatId)) {
-                $this->handleConversation($chatId, $text, $user, $botService, $taskService, $conversationManager, $keyboardService);
+                $this->handleConversation($chatId, $text, $user, $botService, $telegramTaskService, $taskService, $reminderScheduler, $conversationManager, $keyboardService);
                 return;
             }
 
@@ -377,7 +379,9 @@ class ProcessTelegramMessage implements ShouldQueue
         string $text,
         $user,
         TelegramBotService $botService,
+        TelegramTaskService $telegramTaskService,
         TaskService $taskService,
+        TaskReminderScheduler $reminderScheduler,
         ConversationManager $conversationManager,
         TelegramKeyboardService $keyboardService
     ): void {
@@ -419,6 +423,45 @@ class ProcessTelegramMessage implements ShouldQueue
                     $botService->sendMessage(
                         $chatId,
                         TelegramIcons::TARGET . " <b>Настроить задачу:</b>",
+                        $keyboardService->getTaskDetailsInline($task)
+                    );
+                }
+                break;
+
+            case 'set_reminder':
+                if ($step === 'text') {
+                    $taskId = $data['task_id'] ?? null;
+                    if (!$taskId) {
+                        $conversationManager->clearState($chatId);
+                        $botService->sendMessage($chatId, TelegramIcons::ERROR . ' Не удалось определить задачу.', $keyboardService->getMainMenuKeyboard());
+                        return;
+                    }
+
+                    $task = Task::where('id', $taskId)->where('user_id', $user->id)->with(['priority', 'project', 'tags'])->first();
+                    if (!$task) {
+                        $conversationManager->clearState($chatId);
+                        $botService->sendMessage($chatId, TelegramIcons::ERROR . ' Задача не найдена.', $keyboardService->getMainMenuKeyboard());
+                        return;
+                    }
+
+                    $input = trim($text);
+                    $disable = in_array(mb_strtolower($input), ['-', 'нет', 'no', 'off'], true);
+                    $task->reminder_text = $disable ? null : $input;
+                    $task->save();
+
+                    $reminderScheduler->reschedule($task);
+
+                    $conversationManager->clearState($chatId);
+
+                    $botService->sendMessage(
+                        $chatId,
+                        TelegramIcons::SUCCESS . " Напоминания сохранены.",
+                        $keyboardService->getMainMenuKeyboard()
+                    );
+
+                    $botService->sendMessage(
+                        $chatId,
+                        $telegramTaskService->formatTaskMessage($task, true),
                         $keyboardService->getTaskDetailsInline($task)
                     );
                 }

@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Contracts\Repositories\TaskRepositoryInterface;
 use App\DTOs\TaskDTO;
 use App\Models\Task;
+use App\Jobs\ScheduleTaskRemindersJob;
+use App\Services\Reminders\TaskReminderScheduler;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 
 class TaskService
 {
     public function __construct(
-        private TaskRepositoryInterface $repository
+        private TaskRepositoryInterface $repository,
+        private TaskReminderScheduler $reminderScheduler
     ) {}
 
     public function getAllTasks(int $userId): Collection
@@ -37,7 +41,12 @@ class TaskService
             $task->tags()->sync($dto->tagIds);
         }
 
-        return $task->load('tags');
+        $task = $task->load('tags');
+
+        // Планирование напоминаний в фоне (не блокирует UI)
+        ScheduleTaskRemindersJob::dispatch($task->id)->afterResponse();
+
+        return $task;
     }
 
     public function updateTask(Task $task, TaskDTO $dto): Task
@@ -60,11 +69,17 @@ class TaskService
         // Синхронизируем теги
         $task->tags()->sync($dto->tagIds ?? []);
 
-        return $task->load('tags');
+        $task = $task->load('tags');
+
+        // Планирование напоминаний в фоне (не блокирует UI)
+        ScheduleTaskRemindersJob::dispatch($task->id)->afterResponse();
+
+        return $task;
     }
 
     public function deleteTask(Task $task): bool
     {
+        $this->reminderScheduler->cancelPending($task);
         return $this->repository->delete($task);
     }
 
@@ -72,15 +87,26 @@ class TaskService
     {
         $newCompletedStatus = !$task->completed;
 
-        return $this->repository->update($task, [
+        $task = $this->repository->update($task, [
             'completed' => $newCompletedStatus,
             'completed_at' => $newCompletedStatus ? now() : null,
         ]);
+
+        if ($newCompletedStatus) {
+            // Отмена напоминаний — быстро, можно синхронно
+            $this->reminderScheduler->cancelPending($task);
+        } else {
+            // Планирование напоминаний в фоне
+            ScheduleTaskRemindersJob::dispatch($task->id)->afterResponse();
+        }
+
+        return $task;
     }
 
     public function reorderTasks(array $taskIds, int $userId): void
     {
         $this->repository->reorder($taskIds, $userId);
     }
+
 }
 

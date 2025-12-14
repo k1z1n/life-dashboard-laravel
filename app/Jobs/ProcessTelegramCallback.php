@@ -10,12 +10,14 @@ use App\Models\Project;
 use App\Models\Priority;
 use App\Services\Telegram\TelegramAuthService;
 use App\Services\Telegram\TelegramBotService;
+use App\Services\Telegram\ConversationManager;
 use App\Services\Telegram\TelegramKeyboardService;
 use App\Services\Telegram\TelegramTaskService;
 use App\Services\Telegram\TelegramIcons;
 use App\Services\Telegram\Commands\HelpCommand;
 use App\Services\Telegram\Commands\MenuCommand;
 use App\Services\TaskService;
+use App\Services\Reminders\TaskReminderScheduler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -32,6 +34,8 @@ class ProcessTelegramCallback implements ShouldQueue
     public $timeout = 60;
 
     protected TelegramKeyboardService $keyboardService;
+    protected ConversationManager $conversationManager;
+    protected TaskReminderScheduler $reminderScheduler;
 
     public function __construct(
         protected array $callbackData
@@ -41,9 +45,13 @@ class ProcessTelegramCallback implements ShouldQueue
         TelegramBotService $botService,
         TelegramAuthService $authService,
         TelegramTaskService $telegramTaskService,
-        TaskService $taskService
+        TaskService $taskService,
+        ConversationManager $conversationManager,
+        TaskReminderScheduler $reminderScheduler
     ): void {
         $this->keyboardService = new TelegramKeyboardService();
+        $this->conversationManager = $conversationManager;
+        $this->reminderScheduler = $reminderScheduler;
 
         try {
             $callbackQueryId = $this->callbackData['id'];
@@ -431,6 +439,21 @@ class ProcessTelegramCallback implements ShouldQueue
                 $botService->answerCallbackQuery($callbackQueryId);
                 break;
 
+            case 'setreminder':
+                $this->conversationManager->setState($chatId, 'set_reminder', [
+                    'task_id' => $task->id,
+                    'step' => 'text',
+                ]);
+
+                $prompt = TelegramIcons::CLOCK . " <b>Напоминания</b>\n\n";
+                $prompt .= TelegramIcons::TASK . " {$task->title}\n\n";
+                $prompt .= "Отправьте текст напоминаний (например: <i>«каждый час до 18:00»</i>).\n";
+                $prompt .= "Чтобы отключить — отправьте <code>-</code> или <code>нет</code>.";
+
+                $botService->sendMessage($chatId, $prompt, $this->keyboardService->getCreateTaskKeyboard());
+                $botService->answerCallbackQuery($callbackQueryId);
+                break;
+
             case 'edit':
                 $botService->answerCallbackQuery($callbackQueryId, 'Редактирование доступно на сайте', true);
                 break;
@@ -524,6 +547,9 @@ class ProcessTelegramCallback implements ShouldQueue
                 break;
         }
         $task->save();
+
+        // Срок влияет на EXPIRES_AT — пересчитываем напоминания
+        $this->reminderScheduler->reschedule($task);
 
         $botService->answerCallbackQuery($callbackQueryId, TelegramIcons::SUCCESS . ' Срок изменён');
 
