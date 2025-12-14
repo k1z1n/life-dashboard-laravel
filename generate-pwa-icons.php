@@ -56,3 +56,4 @@ foreach ($sizes as $size) {
 
 imagedestroy($image);
 echo "\n🎉 Готово! Иконки созданы в папке public/\n";
+

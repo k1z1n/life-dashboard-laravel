@@ -29,7 +29,7 @@ return [
     // Determinism: keep temperature at 0.
     'temperature' => (float) env('NOTIFICATION_AGENT_TEMPERATURE', 0),
 
-    'max_tokens' => (int) env('NOTIFICATION_AGENT_MAX_TOKENS', 600),
+    'max_tokens' => (int) env('NOTIFICATION_AGENT_MAX_TOKENS', 3000), // Увеличено для 100 уведомлений
 
     'system_prompt' => env('NOTIFICATION_AGENT_SYSTEM_PROMPT', <<<'PROMPT'
 Ты — детерминированный планировщик уведомлений.
@@ -53,7 +53,7 @@ return [
 - Не планируй уведомления раньше CREATED_AT.
 - Если EXPIRES_AT не "none", не планируй уведомления позже EXPIRES_AT.
 - Сортируй уведомления по времени по возрастанию.
-- Максимум 50 уведомлений.
+- Максимум 100 уведомлений.
 PROMPT),
 ];
 

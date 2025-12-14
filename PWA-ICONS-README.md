@@ -57,3 +57,4 @@ convert public/favicon.ico -resize 512x512 public/icon-512.png
 - Убедись, что `display: "standalone"` в `manifest.json` (уже настроено)
 - Иконки должны быть в формате PNG
 - Рекомендуется использовать maskable иконки (с padding для адаптации под разные формы)
+

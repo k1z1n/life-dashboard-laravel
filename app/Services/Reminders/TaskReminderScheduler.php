@@ -88,7 +88,20 @@ class TaskReminderScheduler
                     'updated_at' => now(),
                 ]);
 
+            $now = now();
             foreach ($times as $sendAt) {
+                // Пропускаем уведомления в прошлом или слишком близко к текущему времени
+                // (минимум +1 минута, чтобы избежать бесконечного цикла)
+                if ($sendAt->isPast() || $sendAt->diffInMinutes($now) < 1) {
+                    Log::channel('reminders')->warning('Skipping reminder in past or too soon', [
+                        'task_id' => $task->id,
+                        'send_at' => $sendAt->format('Y-m-d H:i:s'),
+                        'now' => $now->format('Y-m-d H:i:s'),
+                        'diff_minutes' => $sendAt->diffInMinutes($now),
+                    ]);
+                    continue;
+                }
+
                 $created[] = TaskReminder::create([
                     'task_id' => $task->id,
                     'user_id' => $task->user_id,
@@ -108,10 +121,21 @@ class TaskReminderScheduler
         ]);
 
         $dispatched = 0;
+        $now = now();
         foreach ($created as $reminder) {
-            if ($reminder->send_at && $reminder->send_at->isFuture()) {
+            // Диспатчим только уведомления, которые должны быть отправлены минимум через 1 минуту
+            // Это предотвращает создание уведомлений, которые отправятся сразу и вызовут бесконечный цикл
+            if ($reminder->send_at && $reminder->send_at->isFuture() && $reminder->send_at->diffInMinutes($now) >= 1) {
                 SendTelegramTaskReminderJob::dispatch($reminder->id)->delay($reminder->send_at);
                 $dispatched++;
+            } else {
+                Log::channel('reminders')->warning('Reminder skipped (too soon or in past)', [
+                    'task_id' => $task->id,
+                    'reminder_id' => $reminder->id,
+                    'send_at' => $reminder->send_at?->format('Y-m-d H:i:s'),
+                    'now' => $now->format('Y-m-d H:i:s'),
+                    'diff_minutes' => $reminder->send_at ? $reminder->send_at->diffInMinutes($now) : null,
+                ]);
             }
         }
 

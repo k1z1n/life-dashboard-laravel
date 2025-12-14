@@ -120,16 +120,66 @@ class SendTelegramTaskReminderJob implements ShouldQueue
                 'sent_at' => now()->toDateTimeString(),
             ]);
 
+            // АВТОМАТИЧЕСКОЕ ПРОДЛЕНИЕ ОТКЛЮЧЕНО:
+            // Теперь AI может генерировать до 100 уведомлений сразу, поэтому логика auto-extend не нужна.
+            // Если нужно больше уведомлений - пользователь может изменить reminder_text и сохранить задачу снова.
+            /*
             // Автоматическое продление: если осталось мало pending reminders (< 5),
             // пересчитываем напоминания, чтобы продолжить серию логично.
+            // ЗАЩИТА ОТ БЕСКОНЕЧНОГО ЦИКЛА: не запускаем auto-extend, если последнее уведомление
+            // было отправлено менее 10 секунд назад (защита от спама).
             if ($task->reminder_text && trim($task->reminder_text) !== '') {
                 $remainingPending = TaskReminder::where('task_id', $task->id)
                     ->where('channel', $reminder->channel)
                     ->where('status', TaskReminder::STATUS_PENDING)
-                    ->where('send_at', '>', now())
+                    ->where('send_at', '>', now()->addMinute()) // Только те, что минимум через минуту
                     ->count();
 
-                if ($remainingPending < 5) {
+                // Проверяем время последнего отправленного уведомления
+                $lastSent = TaskReminder::where('task_id', $task->id)
+                    ->where('channel', $reminder->channel)
+                    ->where('status', TaskReminder::STATUS_SENT)
+                    ->whereNotNull('sent_at')
+                    ->orderBy('sent_at', 'desc')
+                    ->first();
+
+                $secondsSinceLastSent = $lastSent && $lastSent->sent_at
+                    ? now()->diffInSeconds($lastSent->sent_at, false)
+                    : 999;
+
+                // КРИТИЧЕСКАЯ ЗАЩИТА: не запускаем auto-extend, если:
+                // 1. Осталось достаточно pending reminders (>= 5)
+                // 2. Последнее уведомление было отправлено менее 60 секунд назад (защита от цикла)
+                // 3. Это одноразовое уведомление (AI сгенерировал только 1 уведомление) - не продлеваем
+                if ($remainingPending < 5 && $secondsSinceLastSent >= 60) {
+                    // Проверяем, сколько уведомлений было создано в последнем reschedule
+                    // Если только 1 - это одноразовое уведомление, не продлеваем автоматически
+                    $recentCreated = TaskReminder::where('task_id', $task->id)
+                        ->where('channel', $reminder->channel)
+                        ->where('source_text', trim((string) $task->reminder_text))
+                        ->where('created_at', '>=', now()->subMinutes(5))
+                        ->count();
+
+                    if ($recentCreated <= 1) {
+                        Log::channel('reminders')->debug('Auto-extend skipped (single notification, no auto-extend)', [
+                            'task_id' => $task->id,
+                            'remaining_pending' => $remainingPending,
+                            'recent_created' => $recentCreated,
+                        ]);
+                        return;
+                    }
+
+                    // Дополнительная проверка: если осталось хотя бы одно уведомление в будущем,
+                    // и последнее было отправлено недавно (< 5 минут), не запускаем auto-extend
+                    if ($remainingPending > 0 && $secondsSinceLastSent < 300) {
+                        Log::channel('reminders')->debug('Auto-extend skipped (recent send, has pending)', [
+                            'task_id' => $task->id,
+                            'remaining_pending' => $remainingPending,
+                            'seconds_since_last_sent' => $secondsSinceLastSent,
+                        ]);
+                        return;
+                    }
+
                     // Проверяем, не изменился ли reminder_text с момента последнего расчёта.
                     // Если изменился — это ручное изменение пользователем, нужно пересчитать от now().
                     // Если не изменился — продолжаем серию от last_sent_at.
@@ -147,7 +197,9 @@ class SendTelegramTaskReminderJob implements ShouldQueue
                     Log::channel('reminders')->info('Auto-extending reminders (low pending count)', [
                         'task_id' => $task->id,
                         'remaining_pending' => $remainingPending,
-                        'last_sent_at' => $reminder->sent_at?->format('Y-m-d H:i'),
+                        'last_sent_at' => $reminder->sent_at?->format('Y-m-d H:i:s'),
+                        'seconds_since_last_sent' => $secondsSinceLastSent,
+                        'recent_created' => $recentCreated,
                         'text_changed' => !$shouldContinueFromLastSent,
                         'continue_from_last_sent' => $shouldContinueFromLastSent,
                     ]);
@@ -162,8 +214,16 @@ class SendTelegramTaskReminderJob implements ShouldQueue
                             'error' => $e->getMessage(),
                         ]);
                     }
+                } else {
+                    Log::channel('reminders')->debug('Auto-extend skipped', [
+                        'task_id' => $task->id,
+                        'remaining_pending' => $remainingPending,
+                        'seconds_since_last_sent' => $secondsSinceLastSent,
+                        'reason' => $remainingPending >= 5 ? 'enough_pending' : ($secondsSinceLastSent < 60 ? 'too_recent' : 'unknown'),
+                    ]);
                 }
             }
+            */
         } catch (\Throwable $e) {
             Log::channel('telegram')->error('Failed to send task reminder', [
                 'task_reminder_id' => $reminder->id,
