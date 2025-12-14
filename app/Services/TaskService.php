@@ -44,7 +44,8 @@ class TaskService
         $task = $task->load('tags');
 
         // Планирование напоминаний в фоне (не блокирует UI)
-        ScheduleTaskRemindersJob::dispatch($task->id)->afterResponse();
+        // Используем обычный dispatch - job выполнится асинхронно через queue
+        ScheduleTaskRemindersJob::dispatch($task->id);
 
         return $task;
     }
@@ -72,7 +73,8 @@ class TaskService
         $task = $task->load('tags');
 
         // Планирование напоминаний в фоне (не блокирует UI)
-        ScheduleTaskRemindersJob::dispatch($task->id)->afterResponse();
+        // Используем обычный dispatch - job выполнится асинхронно через queue
+        ScheduleTaskRemindersJob::dispatch($task->id);
 
         return $task;
     }
@@ -97,7 +99,8 @@ class TaskService
             $this->reminderScheduler->cancelPending($task);
         } else {
             // Планирование напоминаний в фоне
-            ScheduleTaskRemindersJob::dispatch($task->id)->afterResponse();
+            // Используем обычный dispatch - job выполнится асинхронно через queue
+            ScheduleTaskRemindersJob::dispatch($task->id);
         }
 
         return $task;

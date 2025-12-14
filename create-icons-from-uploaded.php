@@ -69,3 +69,4 @@ foreach ($sizes as $config) {
 imagedestroy($image);
 echo "\n🎉 Готово! Иконки созданы в папке public/\n";
 echo "📱 Теперь приложение должно корректно работать на Android/Xiaomi\n";
+
